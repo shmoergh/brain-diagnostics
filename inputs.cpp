@@ -22,8 +22,9 @@
 #include <stdio.h>
 #include <brain-common/brain-common.h>
 
-Inputs::Inputs()
-	: selected_input_(SelectedInput::NONE),
+Inputs::Inputs(brain::io::PulseInput* pulse_input)
+	: pulse_input_(pulse_input),
+	  selected_input_(SelectedInput::NONE),
 	  vu_peak_hold_(0),
 	  last_pulse_state_(false),
 	  pulse_state_initialized_(false) {
@@ -40,9 +41,8 @@ void Inputs::init() {
 		printf("Audio/CV inputs initialized successfully\n");
 	}
 
-	// Initialize pulse input
-	pulse_.begin();
-	printf("Pulse input initialized\n");
+	// Pulse is initialized externally - just log
+	printf("Pulse input ready (shared instance)\n");
 
 	printf("Inputs initialized\n");
 }
@@ -52,10 +52,10 @@ void Inputs::update() {
 	audio_cv_in_.update();
 
 	// Poll pulse input for edge detection (non-blocking)
-	pulse_.poll();
+	pulse_input_->poll();
 }
 
-void Inputs::set_selected_input(SelectedInput selected) {
+void Inputs::set_selected_input(SelectedInput selected, bool print_change) {
 	if (selected != selected_input_) {
 		selected_input_ = selected;
 		// Reset VU meter state when switching inputs
@@ -65,25 +65,27 @@ void Inputs::set_selected_input(SelectedInput selected) {
 		// Reset pulse state tracking when switching inputs
 		pulse_state_initialized_ = false;
 
-		// Print selection change
-		const char* input_name;
-		switch (selected) {
-			case SelectedInput::NONE:
-				input_name = "NONE";
-				break;
-			case SelectedInput::AUDIO_A:
-				input_name = "AUDIO_A";
-				break;
-			case SelectedInput::AUDIO_B:
-				input_name = "AUDIO_B";
-				break;
-			case SelectedInput::PULSE:
-				input_name = "PULSE";
-				break;
-			default:
-				input_name = "UNKNOWN";
+		// Print selection change only if requested
+		if (print_change) {
+			const char* input_name;
+			switch (selected) {
+				case SelectedInput::NONE:
+					input_name = "NONE";
+					break;
+				case SelectedInput::AUDIO_A:
+					input_name = "AUDIO_A";
+					break;
+				case SelectedInput::AUDIO_B:
+					input_name = "AUDIO_B";
+					break;
+				case SelectedInput::PULSE:
+					input_name = "PULSE";
+					break;
+				default:
+					input_name = "UNKNOWN";
+			}
+			printf("\nInput selected: %s\n", input_name);
 		}
-		printf("\nInput selected: %s\n", input_name);
 	}
 }
 
@@ -132,16 +134,19 @@ uint8_t Inputs::get_vu_meter_level() {
 }
 
 bool Inputs::is_pulse_high() {
-	bool current_state = pulse_.read();
+	bool raw_gpio = pulse_input_->read_raw();
+	bool current_state = pulse_input_->read();
 
 	// Track state changes and print diagnostic info when pulse input is selected
 	if (selected_input_ == SelectedInput::PULSE) {
 		if (!pulse_state_initialized_) {
-			printf("Pulse state: %s\n", current_state ? "HIGH" : "LOW");
+			printf("[INPUT] Pulse state: %s (raw GPIO: %d)\n",
+			       current_state ? "HIGH" : "LOW", raw_gpio);
 			last_pulse_state_ = current_state;
 			pulse_state_initialized_ = true;
 		} else if (current_state != last_pulse_state_) {
-			printf("\nPulse state changed: %s\n", current_state ? "HIGH" : "LOW");
+			printf("\n[INPUT] Pulse state changed: %s (raw GPIO: %d)\n",
+			       current_state ? "HIGH" : "LOW", raw_gpio);
 			last_pulse_state_ = current_state;
 		}
 	}

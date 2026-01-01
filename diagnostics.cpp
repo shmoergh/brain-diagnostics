@@ -37,7 +37,9 @@ constexpr uint32_t STARTUP_ANIMATION_DELAY = 1000;
 constexpr uint32_t BRIGHTNESS_TEST_DELAY = 500;
 
 Diagnostics::Diagnostics()
-	: current_state_(State::LED_STARTUP_ANIMATION),
+	: inputs_(&pulse_input_),
+	  outputs_(&pulse_output_),
+	  current_state_(State::LED_STARTUP_ANIMATION),
 	  current_led_(0),
 	  current_brightness_step_(0),
 	  startup_animation_count_(0),
@@ -62,6 +64,13 @@ void Diagnostics::init() {
 
 	// Initialize potentiometers and buttons
 	pots_and_buttons_.init();
+
+	// Initialize separate pulse instances for input and output
+	pulse_input_.begin();
+	printf("Pulse input initialized\n");
+
+	pulse_output_.begin();
+	printf("Pulse output initialized\n");
 
 	// Initialize inputs (audio/CV and pulse)
 	inputs_.init();
@@ -151,6 +160,9 @@ void Diagnostics::test_led_brightness() {
 				printf("USAGE:\n");
 				printf("- Turn pots to see LED feedback\n");
 				printf("- Press buttons to light all LEDs\n");
+				printf("- Hold BOTH buttons (no pots) to see STATUS DISPLAY:\n");
+				printf("  LED 1=Input A, LED 2=Input B, LED 3=Pulse In\n");
+				printf("  LED 4=Output A, LED 5=Output B, LED 6=Pulse Out\n");
 				printf("- Hold BOTH buttons + turn pot 1 to select INPUT\n");
 				printf("- Hold BOTH buttons + turn pot 2 to select OUTPUT\n");
 				printf("- Hold BOTH buttons + turn pot 3 to select coupling (AC/DC)\n");
@@ -189,36 +201,28 @@ void Diagnostics::interactive_mode() {
 		uint16_t pot1 = pots_and_buttons_.get_pot_value(1);
 		uint16_t pot2 = pots_and_buttons_.get_pot_value(2);
 
-		// Determine which knob is being used based on which is not at zero
-		// Priority: third knob > second knob > first knob (right to left)
-		if (pot2 > 5) {  // Small threshold to avoid noise
-			// Third knob controls AC/DC coupling
-			update_coupling_from_pot();
-			// Show coupling state on LEDs (0 LEDs = DC, all LEDs = AC)
-			bool ac_coupled = outputs_.is_ac_coupled();
-			if (ac_coupled && !last_leds_all_on_) {
-				leds_.on_all();
-				last_leds_all_on_ = true;
-				last_num_leds_ = 255;  // Mark as special state
-			} else if (!ac_coupled && (last_num_leds_ != 0 || last_leds_all_on_)) {
-				leds_.off_all();
-				last_leds_all_on_ = false;
-				last_num_leds_ = 0;
-			}
-		} else if (pot1 > 5) {
-			// Second knob controls output selection
-			handle_output_selection();
-		} else if (pot0 > 0) {
-			// First knob controls input selection
-			handle_input_selection();
-		} else {
-			// All at zero, show no selection
-			if (last_num_leds_ != 0 || last_leds_all_on_) {
-				leds_.off_all();
-				last_num_leds_ = 0;
-				last_leds_all_on_ = false;
-			}
+		// Update selections based on pot positions (all pots checked independently)
+		// Don't print selection changes while buttons held - only print final config on release
+		// First knob controls input selection
+		if (pot0 > 0) {
+			Inputs::SelectedInput selected = inputs_.map_pot_to_input_selection(pot0);
+			inputs_.set_selected_input(selected, false);  // Don't print while selecting
 		}
+
+		// Second knob controls output selection
+		if (pot1 > 0) {
+			Outputs::SelectedOutput selected = outputs_.map_pot_to_output_selection(pot1);
+			outputs_.set_selected_output(selected, false);  // Don't print while selecting
+		}
+
+		// Third knob controls AC/DC coupling
+		if (pot2 > 5) {  // Small threshold to avoid noise
+			update_coupling_from_pot();
+		}
+
+		// Always show status display when both buttons are held
+		// This shows which inputs/outputs are currently active in real-time
+		show_status_display();
 
 		both_buttons_held_ = true;
 	} else {
@@ -231,22 +235,28 @@ void Diagnostics::interactive_mode() {
 			       (int)outputs_.get_selected_output(),
 			       outputs_.is_ac_coupled() ? "AC" : "DC");
 			printf("====================\n");
+
+			// Turn off all LEDs when buttons are released
+			leds_.off_all();
+			last_num_leds_ = 0;
+			last_leds_all_on_ = false;
+
 			both_buttons_held_ = false;
 		}
 
-		// Priority: input testing > output testing > normal mode
-		// This allows loopback testing (select output to generate, select input to see VU meter)
+		// Simple logic: Input controls LEDs, output controls waveform generation
+		// They are completely independent
+
 		if (inputs_.get_selected_input() != Inputs::SelectedInput::NONE) {
-			// Input testing mode - show VU meter or pulse
-			// (Output will still generate if selected, via outputs_.update())
+			// Input selected - show VU meter or pulse on LEDs
 			handle_input_testing();
-		} else if (outputs_.get_selected_output() != Outputs::SelectedOutput::NONE) {
-			// Output testing mode - show output indicator
-			handle_output_testing();
 		} else {
-			// Normal pot and button mode
+			// No input selected - normal pot and button mode
 			update_leds_from_pots_and_buttons();
 		}
+
+		// Output never affects LEDs - it only generates waveforms via outputs_.update()
+		// which is called at the top of interactive_mode()
 	}
 }
 
@@ -281,34 +291,6 @@ void Diagnostics::update_leds_from_pots_and_buttons() {
 	// Only update LEDs if the count changed
 	if (num_leds != last_num_leds_ || last_leds_all_on_) {
 		// Update LEDs: light up num_leds LEDs from the left
-		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-			if (i < num_leds) {
-				leds_.on(i);
-			} else {
-				leds_.off(i);
-			}
-		}
-		last_num_leds_ = num_leds;
-		last_leds_all_on_ = false;
-	}
-}
-
-void Diagnostics::handle_input_selection() {
-	// Get first pot value (0-127)
-	uint16_t pot_value = pots_and_buttons_.get_pot_value(0);
-
-	// Map pot to input selection
-	Inputs::SelectedInput selected = inputs_.map_pot_to_input_selection(pot_value);
-
-	// Update selected input
-	inputs_.set_selected_input(selected);
-
-	// Show selection on LEDs
-	uint8_t num_leds = inputs_.get_selection_indicator_leds();
-
-	// Only update LEDs if the count changed
-	if (num_leds != last_num_leds_ || last_leds_all_on_) {
-		// Update LEDs to show selection
 		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
 			if (i < num_leds) {
 				leds_.on(i);
@@ -361,46 +343,6 @@ void Diagnostics::handle_input_testing() {
 	}
 }
 
-void Diagnostics::handle_output_selection() {
-	// Get second pot value (0-127)
-	uint16_t pot_value = pots_and_buttons_.get_pot_value(1);
-
-	// Map pot to output selection
-	Outputs::SelectedOutput selected = outputs_.map_pot_to_output_selection(pot_value);
-
-	// Update selected output
-	outputs_.set_selected_output(selected);
-
-	// Show selection on LEDs
-	uint8_t num_leds = outputs_.get_selection_indicator_leds();
-
-	// Only update LEDs if the count changed
-	if (num_leds != last_num_leds_ || last_leds_all_on_) {
-		// Update LEDs to show selection
-		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-			if (i < num_leds) {
-				leds_.on(i);
-			} else {
-				leds_.off(i);
-			}
-		}
-		last_num_leds_ = num_leds;
-		last_leds_all_on_ = false;
-	}
-}
-
-void Diagnostics::handle_output_testing() {
-	// Output is generating waveforms in outputs_.update()
-	// LEDs are off - user verifies output by connecting to input or using oscilloscope
-
-	// Only turn off if not already off
-	if (last_num_leds_ != 0 || last_leds_all_on_) {
-		leds_.off_all();
-		last_num_leds_ = 0;
-		last_leds_all_on_ = false;
-	}
-}
-
 void Diagnostics::update_coupling_from_pot() {
 	// Get third pot value (0-127)
 	uint16_t pot_value = pots_and_buttons_.get_pot_value(2);
@@ -409,4 +351,60 @@ void Diagnostics::update_coupling_from_pot() {
 	bool use_ac = (pot_value >= 64);
 
 	outputs_.set_ac_coupling(use_ac);
+}
+
+void Diagnostics::show_status_display() {
+	// Status display mode: show which inputs and outputs are currently active
+	// LED mapping:
+	// LED 0 (LED 1) → Input Audio A active
+	// LED 1 (LED 2) → Input Audio B active
+	// LED 2 (LED 3) → Pulse In active
+	// LED 3 (LED 4) → Output Audio A active
+	// LED 4 (LED 5) → Output Audio B active
+	// LED 5 (LED 6) → Pulse Out active
+
+	Inputs::SelectedInput selected_input = inputs_.get_selected_input();
+	Outputs::SelectedOutput selected_output = outputs_.get_selected_output();
+
+	// LED 0: Input Audio A
+	if (selected_input == Inputs::SelectedInput::AUDIO_A) {
+		leds_.on(0);
+	} else {
+		leds_.off(0);
+	}
+
+	// LED 1: Input Audio B
+	if (selected_input == Inputs::SelectedInput::AUDIO_B) {
+		leds_.on(1);
+	} else {
+		leds_.off(1);
+	}
+
+	// LED 2: Pulse In
+	if (selected_input == Inputs::SelectedInput::PULSE) {
+		leds_.on(2);
+	} else {
+		leds_.off(2);
+	}
+
+	// LED 3: Output Audio A
+	if (selected_output == Outputs::SelectedOutput::AUDIO_A) {
+		leds_.on(3);
+	} else {
+		leds_.off(3);
+	}
+
+	// LED 4: Output Audio B
+	if (selected_output == Outputs::SelectedOutput::AUDIO_B) {
+		leds_.on(4);
+	} else {
+		leds_.off(4);
+	}
+
+	// LED 5: Pulse Out
+	if (selected_output == Outputs::SelectedOutput::PULSE) {
+		leds_.on(5);
+	} else {
+		leds_.off(5);
+	}
 }

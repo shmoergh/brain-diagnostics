@@ -23,8 +23,9 @@
 #include "outputs.h"
 #include <stdio.h>
 
-Outputs::Outputs()
-	: selected_output_(SelectedOutput::NONE),
+Outputs::Outputs(brain::io::PulseOutput* pulse_output)
+	: pulse_output_(pulse_output),
+	  selected_output_(SelectedOutput::NONE),
 	  ac_coupled_(false),
 	  last_phase_ms_(0),
 	  pulse_state_(false),
@@ -42,10 +43,9 @@ void Outputs::init() {
 		printf("Audio/CV outputs initialized successfully\n");
 	}
 
-	// Initialize pulse output
-	pulse_.begin();
-	pulse_.set(false);  // Start with pulse low
-	printf("Pulse output initialized\n");
+	// Pulse is initialized externally - set initial state
+	pulse_output_->set(false);  // Start with pulse low
+	printf("Pulse output ready (dedicated instance)\n");
 
 	// Set default DC coupling
 	audio_cv_out_.set_coupling(brain::io::AudioCvOutChannel::kChannelA,
@@ -82,7 +82,7 @@ void Outputs::update() {
 	}
 }
 
-void Outputs::set_selected_output(SelectedOutput selected) {
+void Outputs::set_selected_output(SelectedOutput selected, bool print_change) {
 	if (selected != selected_output_) {
 		// Stop previous output
 		stop_all_outputs();
@@ -94,25 +94,27 @@ void Outputs::set_selected_output(SelectedOutput selected) {
 		last_phase_ms_ = 0;
 		pulse_state_ = false;
 
-		// Print selection change
-		const char* output_name;
-		switch (selected) {
-			case SelectedOutput::NONE:
-				output_name = "NONE";
-				break;
-			case SelectedOutput::AUDIO_A:
-				output_name = "AUDIO_A (1Hz triangle wave)";
-				break;
-			case SelectedOutput::AUDIO_B:
-				output_name = "AUDIO_B (1Hz triangle wave)";
-				break;
-			case SelectedOutput::PULSE:
-				output_name = "PULSE (1Hz square wave)";
-				break;
-			default:
-				output_name = "UNKNOWN";
+		// Print selection change only if requested
+		if (print_change) {
+			const char* output_name;
+			switch (selected) {
+				case SelectedOutput::NONE:
+					output_name = "NONE";
+					break;
+				case SelectedOutput::AUDIO_A:
+					output_name = "AUDIO_A (1Hz triangle wave)";
+					break;
+				case SelectedOutput::AUDIO_B:
+					output_name = "AUDIO_B (1Hz triangle wave)";
+					break;
+				case SelectedOutput::PULSE:
+					output_name = "PULSE (1Hz square wave)";
+					break;
+				default:
+					output_name = "UNKNOWN";
+			}
+			printf("\nOutput selected: %s\n", output_name);
 		}
-		printf("\nOutput selected: %s\n", output_name);
 	}
 }
 
@@ -231,8 +233,8 @@ void Outputs::generate_square_wave() {
 	// Only update if state changed
 	if (new_state != pulse_state_) {
 		pulse_state_ = new_state;
-		pulse_.set(pulse_state_);
-		printf("Pulse output: %s (phase: %dms/%dms)\n", pulse_state_ ? "HIGH" : "LOW", phase_ms, WAVEFORM_PERIOD_MS);
+		pulse_output_->set(pulse_state_);
+		printf("[OUTPUT] Pulse output: %s (phase: %dms/%dms)\n", pulse_state_ ? "HIGH" : "LOW", phase_ms, WAVEFORM_PERIOD_MS);
 	}
 }
 
@@ -243,6 +245,6 @@ void Outputs::stop_all_outputs() {
 	audio_cv_out_.set_voltage(brain::io::AudioCvOutChannel::kChannelB, stop_voltage);
 
 	// Set pulse output low
-	pulse_.set(false);
+	pulse_output_->set(false);
 	pulse_state_ = false;
 }

@@ -3,6 +3,8 @@
 
 #include <pico/stdlib.h>
 #include <brain-ui/leds.h>
+#include <brain-io/pulse-input.h>
+#include <brain-io/pulse-output.h>
 #include "pots_and_buttons.h"
 #include "inputs.h"
 #include "outputs.h"
@@ -45,15 +47,15 @@ private:
 
 	// Helper methods
 	void update_leds_from_pots_and_buttons();
-	void handle_input_selection();
 	void handle_input_testing();
-	void handle_output_selection();
-	void handle_output_testing();
 	void update_coupling_from_pot();
+	void show_status_display();
 
 	// Components
 	brain::ui::Leds leds_;
 	PotsAndButtons pots_and_buttons_;
+	brain::io::PulseInput pulse_input_;   // Dedicated pulse input instance
+	brain::io::PulseOutput pulse_output_;  // Dedicated pulse output instance
 	Inputs inputs_;
 	Outputs outputs_;
 
