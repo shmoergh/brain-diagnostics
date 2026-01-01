@@ -5,6 +5,7 @@
 #include <brain-ui/leds.h>
 #include "pots_and_buttons.h"
 #include "inputs.h"
+#include "outputs.h"
 
 /**
  * @brief Main diagnostics application class for Brain board hardware testing
@@ -48,11 +49,15 @@ private:
 	void update_leds_from_pots_and_buttons();
 	void handle_input_selection();
 	void handle_input_testing();
+	void handle_output_selection();
+	void handle_output_testing();
+	void update_coupling_from_pot();
 
 	// Components
 	brain::ui::Leds leds_;
 	PotsAndButtons pots_and_buttons_;
 	Inputs inputs_;
+	Outputs outputs_;
 
 	// State tracking
 	enum class State {
@@ -69,9 +74,10 @@ private:
 	absolute_time_t last_update_time_;
 	uint8_t startup_animation_count_;
 
-	// Input selection state
+	// Input/output selection state
 	bool both_buttons_held_;
 	Inputs::SelectedInput last_selected_input_;
+	Outputs::SelectedOutput last_selected_output_;
 };
 
 #endif  // DIAGNOSTICS_H_

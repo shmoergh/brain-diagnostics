@@ -21,7 +21,8 @@ Diagnostics::Diagnostics()
 	  current_brightness_step_(0),
 	  startup_animation_count_(0),
 	  both_buttons_held_(false),
-	  last_selected_input_(Inputs::SelectedInput::NONE) {
+	  last_selected_input_(Inputs::SelectedInput::NONE),
+	  last_selected_output_(Outputs::SelectedOutput::NONE) {
 }
 
 void Diagnostics::init() {
@@ -37,6 +38,9 @@ void Diagnostics::init() {
 
 	// Initialize inputs (audio/CV and pulse)
 	inputs_.init();
+
+	// Initialize outputs (audio/CV and pulse)
+	outputs_.init();
 
 	// Start LED testing
 	current_state_ = State::LED_STARTUP_ANIMATION;
@@ -136,27 +140,53 @@ void Diagnostics::interactive_mode() {
 	// Update all components (non-blocking)
 	pots_and_buttons_.update();
 	inputs_.update();
+	outputs_.update();  // Update waveform generation
 
 	// Check if both buttons are held
 	bool both_held = pots_and_buttons_.is_button1_pressed() &&
 	                 pots_and_buttons_.is_button2_pressed();
 
 	if (both_held) {
-		// Input selection mode - use first knob to select input
-		handle_input_selection();
+		// Selection mode - use knobs to select input or output
+		// First knob = input selection, second knob = output selection
+		// Determine which knob is being used by checking which has changed more recently
+
+		uint16_t pot0 = pots_and_buttons_.get_pot_value(0);
+		uint16_t pot1 = pots_and_buttons_.get_pot_value(1);
+
+		// Use second knob for output selection if it's not at zero
+		if (pot1 > 5) {  // Small threshold to avoid noise
+			handle_output_selection();
+		} else if (pot0 > 0) {
+			handle_input_selection();
+		} else {
+			// Both at zero, show no selection
+			leds_.off_all();
+		}
+
 		both_buttons_held_ = true;
 	} else {
 		// Check if we just released buttons after selection
 		if (both_buttons_held_) {
-			// Buttons just released - activate the selected input
-			Inputs::SelectedInput selected = inputs_.get_selected_input();
-			printf("Input selection: %d\n", (int)selected);
+			// Buttons just released
+			printf("Input: %d, Output: %d\n",
+			       (int)inputs_.get_selected_input(),
+			       (int)outputs_.get_selected_output());
 			both_buttons_held_ = false;
 		}
 
-		// Check if an input is selected for testing
-		if (inputs_.get_selected_input() != Inputs::SelectedInput::NONE) {
-			// Show input testing (VU meter or pulse)
+		// Update AC/DC coupling with third knob if an audio output is selected
+		if (outputs_.get_selected_output() == Outputs::SelectedOutput::AUDIO_A ||
+		    outputs_.get_selected_output() == Outputs::SelectedOutput::AUDIO_B) {
+			update_coupling_from_pot();
+		}
+
+		// Priority: output testing > input testing > normal mode
+		if (outputs_.get_selected_output() != Outputs::SelectedOutput::NONE) {
+			// Output testing mode - generate waveforms
+			handle_output_testing();
+		} else if (inputs_.get_selected_input() != Inputs::SelectedInput::NONE) {
+			// Input testing mode - show VU meter or pulse
 			handle_input_testing();
 		} else {
 			// Normal pot and button mode
@@ -245,4 +275,71 @@ void Diagnostics::handle_input_testing() {
 			leds_.off_all();
 		}
 	}
+}
+
+void Diagnostics::handle_output_selection() {
+	// Get second pot value (0-127)
+	uint16_t pot_value = pots_and_buttons_.get_pot_value(1);
+
+	// Map pot to output selection
+	Outputs::SelectedOutput selected = outputs_.map_pot_to_output_selection(pot_value);
+
+	// Update selected output
+	outputs_.set_selected_output(selected);
+
+	// Clear any selected input when selecting output
+	if (selected != Outputs::SelectedOutput::NONE) {
+		inputs_.set_selected_input(Inputs::SelectedInput::NONE);
+	}
+
+	// Show selection on LEDs
+	uint8_t num_leds = outputs_.get_selection_indicator_leds();
+
+	// Update LEDs to show selection
+	for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+		if (i < num_leds) {
+			leds_.on(i);
+		} else {
+			leds_.off(i);
+		}
+	}
+}
+
+void Diagnostics::handle_output_testing() {
+	// Output is generating waveforms in outputs_.update()
+	// Just show a simple indicator that output is active
+
+	Outputs::SelectedOutput selected = outputs_.get_selected_output();
+
+	// Show all LEDs blinking slowly to indicate output is active
+	// Use a simple on/off pattern based on time
+	absolute_time_t current_time = get_absolute_time();
+	uint64_t elapsed_ms = absolute_time_diff_us(get_absolute_time(), current_time) / 1000;
+
+	// Blink pattern: 500ms on, 500ms off
+	bool leds_on = ((elapsed_ms / 500) % 2) == 0;
+
+	if (leds_on) {
+		// Show which output is selected (2, 4, or 6 LEDs)
+		uint8_t num_leds = outputs_.get_selection_indicator_leds();
+		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+			if (i < num_leds) {
+				leds_.on(i);
+			} else {
+				leds_.off(i);
+			}
+		}
+	} else {
+		leds_.off_all();
+	}
+}
+
+void Diagnostics::update_coupling_from_pot() {
+	// Get third pot value (0-127)
+	uint16_t pot_value = pots_and_buttons_.get_pot_value(2);
+
+	// Map to coupling: < 64 = DC, >= 64 = AC
+	bool use_ac = (pot_value >= 64);
+
+	outputs_.set_ac_coupling(use_ac);
 }
