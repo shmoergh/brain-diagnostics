@@ -328,31 +328,8 @@ void Diagnostics::handle_output_selection() {
 
 void Diagnostics::handle_output_testing() {
 	// Output is generating waveforms in outputs_.update()
-	// Just show a simple indicator that output is active
-
-	Outputs::SelectedOutput selected = outputs_.get_selected_output();
-
-	// Show all LEDs blinking slowly to indicate output is active
-	// Use a simple on/off pattern based on time
-	absolute_time_t current_time = get_absolute_time();
-	uint64_t elapsed_ms = absolute_time_diff_us(get_absolute_time(), current_time) / 1000;
-
-	// Blink pattern: 500ms on, 500ms off
-	bool leds_on = ((elapsed_ms / 500) % 2) == 0;
-
-	if (leds_on) {
-		// Show which output is selected (2, 4, or 6 LEDs)
-		uint8_t num_leds = outputs_.get_selection_indicator_leds();
-		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-			if (i < num_leds) {
-				leds_.on(i);
-			} else {
-				leds_.off(i);
-			}
-		}
-	} else {
-		leds_.off_all();
-	}
+	// LEDs are off - user verifies output by connecting to input or using oscilloscope
+	leds_.off_all();
 }
 
 void Diagnostics::update_coupling_from_pot() {
