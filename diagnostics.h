@@ -3,6 +3,7 @@
 
 #include <pico/stdlib.h>
 #include <brain-ui/leds.h>
+#include "pots_and_buttons.h"
 
 /**
  * @brief Main diagnostics application class for Brain board hardware testing
@@ -38,11 +39,16 @@ private:
 	void test_led_startup_animation();
 	void test_led_brightness();
 
+	// Interactive mode methods
+	void interactive_mode();
+
 	// Helper methods
 	void delay_ms(uint32_t ms);
+	void update_leds_from_pots_and_buttons();
 
 	// Components
 	brain::ui::Leds leds_;
+	PotsAndButtons pots_and_buttons_;
 
 	// State tracking
 	enum class State {

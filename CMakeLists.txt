@@ -14,6 +14,7 @@ add_subdirectory(brain-sdk)
 add_executable(brain-diagnostics
 	main.cpp
 	diagnostics.cpp
+	pots_and_buttons.cpp
 )
 
 target_link_libraries(brain-diagnostics

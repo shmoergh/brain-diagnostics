@@ -30,6 +30,9 @@ void Diagnostics::init() {
 	leds_.init();
 	printf("LEDs initialized\n");
 
+	// Initialize potentiometers and buttons
+	pots_and_buttons_.init();
+
 	// Start LED testing
 	current_state_ = State::LED_STARTUP_ANIMATION;
 	last_update_time_ = get_absolute_time();
@@ -49,7 +52,7 @@ void Diagnostics::update() {
 			break;
 
 		case State::INTERACTIVE_MODE:
-			// TODO: Will be implemented in later milestones
+			interactive_mode();
 			break;
 	}
 }
@@ -122,4 +125,45 @@ void Diagnostics::test_led_brightness() {
 
 void Diagnostics::delay_ms(uint32_t ms) {
 	sleep_ms(ms);
+}
+
+void Diagnostics::interactive_mode() {
+	// Update pots and buttons state (non-blocking)
+	pots_and_buttons_.update();
+
+	// Update LED display based on pot and button state
+	update_leds_from_pots_and_buttons();
+}
+
+void Diagnostics::update_leds_from_pots_and_buttons() {
+	// Priority 1: If any button is pressed, light all LEDs
+	if (pots_and_buttons_.is_any_button_pressed()) {
+		leds_.on_all();
+		return;
+	}
+
+	// Priority 2: Show the potentiometer with the highest value
+	// This gives good interactive feedback when user turns any pot
+	uint8_t max_pot_index = 0;
+	uint16_t max_pot_value = 0;
+
+	for (uint8_t i = 0; i < 3; i++) {
+		uint16_t pot_value = pots_and_buttons_.get_pot_value(i);
+		if (pot_value > max_pot_value) {
+			max_pot_value = pot_value;
+			max_pot_index = i;
+		}
+	}
+
+	// Map the highest pot value to LED count
+	uint8_t num_leds = pots_and_buttons_.map_pot_to_leds(max_pot_index);
+
+	// Update LEDs: light up num_leds LEDs from the left
+	for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+		if (i < num_leds) {
+			leds_.on(i);
+		} else {
+			leds_.off(i);
+		}
+	}
 }
