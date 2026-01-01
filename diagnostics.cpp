@@ -41,7 +41,9 @@ Diagnostics::Diagnostics()
 	  current_led_(0),
 	  current_brightness_step_(0),
 	  startup_animation_count_(0),
-	  both_buttons_held_(false) {
+	  both_buttons_held_(false),
+	  last_num_leds_(255),  // Invalid value to force first update
+	  last_leds_all_on_(false) {
 }
 
 void Diagnostics::init() {
@@ -177,10 +179,15 @@ void Diagnostics::interactive_mode() {
 			// Third knob controls AC/DC coupling
 			update_coupling_from_pot();
 			// Show coupling state on LEDs (0 LEDs = DC, all LEDs = AC)
-			if (outputs_.is_ac_coupled()) {
+			bool ac_coupled = outputs_.is_ac_coupled();
+			if (ac_coupled && !last_leds_all_on_) {
 				leds_.on_all();
-			} else {
+				last_leds_all_on_ = true;
+				last_num_leds_ = 255;  // Mark as special state
+			} else if (!ac_coupled && (last_num_leds_ != 0 || last_leds_all_on_)) {
 				leds_.off_all();
+				last_leds_all_on_ = false;
+				last_num_leds_ = 0;
 			}
 		} else if (pot1 > 5) {
 			// Second knob controls output selection
@@ -190,7 +197,11 @@ void Diagnostics::interactive_mode() {
 			handle_input_selection();
 		} else {
 			// All at zero, show no selection
-			leds_.off_all();
+			if (last_num_leds_ != 0 || last_leds_all_on_) {
+				leds_.off_all();
+				last_num_leds_ = 0;
+				last_leds_all_on_ = false;
+			}
 		}
 
 		both_buttons_held_ = true;
@@ -224,7 +235,12 @@ void Diagnostics::interactive_mode() {
 void Diagnostics::update_leds_from_pots_and_buttons() {
 	// Priority 1: If any button is pressed, light all LEDs
 	if (pots_and_buttons_.is_any_button_pressed()) {
-		leds_.on_all();
+		// Only update if not already all on
+		if (!last_leds_all_on_) {
+			leds_.on_all();
+			last_leds_all_on_ = true;
+			last_num_leds_ = 255;  // Mark as special state
+		}
 		return;
 	}
 
@@ -244,13 +260,18 @@ void Diagnostics::update_leds_from_pots_and_buttons() {
 	// Map the highest pot value to LED count
 	uint8_t num_leds = pots_and_buttons_.map_pot_to_leds(max_pot_index);
 
-	// Update LEDs: light up num_leds LEDs from the left
-	for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-		if (i < num_leds) {
-			leds_.on(i);
-		} else {
-			leds_.off(i);
+	// Only update LEDs if the count changed
+	if (num_leds != last_num_leds_ || last_leds_all_on_) {
+		// Update LEDs: light up num_leds LEDs from the left
+		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+			if (i < num_leds) {
+				leds_.on(i);
+			} else {
+				leds_.off(i);
+			}
 		}
+		last_num_leds_ = num_leds;
+		last_leds_all_on_ = false;
 	}
 }
 
@@ -267,13 +288,18 @@ void Diagnostics::handle_input_selection() {
 	// Show selection on LEDs
 	uint8_t num_leds = inputs_.get_selection_indicator_leds();
 
-	// Update LEDs to show selection
-	for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-		if (i < num_leds) {
-			leds_.on(i);
-		} else {
-			leds_.off(i);
+	// Only update LEDs if the count changed
+	if (num_leds != last_num_leds_ || last_leds_all_on_) {
+		// Update LEDs to show selection
+		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+			if (i < num_leds) {
+				leds_.on(i);
+			} else {
+				leds_.off(i);
+			}
 		}
+		last_num_leds_ = num_leds;
+		last_leds_all_on_ = false;
 	}
 }
 
@@ -285,20 +311,34 @@ void Diagnostics::handle_input_testing() {
 		// Show VU meter for audio inputs
 		uint8_t vu_level = inputs_.get_vu_meter_level();
 
-		// Update LEDs to show VU meter
-		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-			if (i < vu_level) {
-				leds_.on(i);
-			} else {
-				leds_.off(i);
+		// Only update LEDs if the VU level changed
+		if (vu_level != last_num_leds_ || last_leds_all_on_) {
+			// Update LEDs to show VU meter
+			for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+				if (i < vu_level) {
+					leds_.on(i);
+				} else {
+					leds_.off(i);
+				}
 			}
+			last_num_leds_ = vu_level;
+			last_leds_all_on_ = false;
 		}
 	} else if (selected == Inputs::SelectedInput::PULSE) {
 		// Show pulse state
-		if (inputs_.is_pulse_high()) {
-			leds_.on_all();
-		} else {
-			leds_.off_all();
+		bool pulse_high = inputs_.is_pulse_high();
+
+		// Only update if pulse state changed
+		if (pulse_high != last_leds_all_on_) {
+			if (pulse_high) {
+				leds_.on_all();
+				last_leds_all_on_ = true;
+				last_num_leds_ = 255;  // Mark as special state
+			} else {
+				leds_.off_all();
+				last_leds_all_on_ = false;
+				last_num_leds_ = 0;
+			}
 		}
 	}
 }
@@ -316,20 +356,31 @@ void Diagnostics::handle_output_selection() {
 	// Show selection on LEDs
 	uint8_t num_leds = outputs_.get_selection_indicator_leds();
 
-	// Update LEDs to show selection
-	for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
-		if (i < num_leds) {
-			leds_.on(i);
-		} else {
-			leds_.off(i);
+	// Only update LEDs if the count changed
+	if (num_leds != last_num_leds_ || last_leds_all_on_) {
+		// Update LEDs to show selection
+		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+			if (i < num_leds) {
+				leds_.on(i);
+			} else {
+				leds_.off(i);
+			}
 		}
+		last_num_leds_ = num_leds;
+		last_leds_all_on_ = false;
 	}
 }
 
 void Diagnostics::handle_output_testing() {
 	// Output is generating waveforms in outputs_.update()
 	// LEDs are off - user verifies output by connecting to input or using oscilloscope
-	leds_.off_all();
+
+	// Only turn off if not already off
+	if (last_num_leds_ != 0 || last_leds_all_on_) {
+		leds_.off_all();
+		last_num_leds_ = 0;
+		last_leds_all_on_ = false;
+	}
 }
 
 void Diagnostics::update_coupling_from_pot() {

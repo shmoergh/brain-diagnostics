@@ -74,6 +74,10 @@ private:
 
 	// Input/output selection state
 	bool both_buttons_held_;
+
+	// LED update optimization - track last displayed value to avoid redundant updates
+	uint8_t last_num_leds_;
+	bool last_leds_all_on_;
 };
 
 #endif  // DIAGNOSTICS_H_
