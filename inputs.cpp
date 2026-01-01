@@ -95,6 +95,8 @@ uint8_t Inputs::get_vu_meter_level() {
 		raw_adc = audio_cv_in_.get_raw_channel_b();
 	}
 
+	printf("Raw ADC: %u\r", raw_adc);
+
 	// Calculate VU level with peak hold
 	return calculate_vu_level(raw_adc);
 }
