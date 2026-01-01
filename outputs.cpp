@@ -27,7 +27,8 @@ Outputs::Outputs()
 	: selected_output_(SelectedOutput::NONE),
 	  ac_coupled_(false),
 	  last_phase_ms_(0),
-	  pulse_state_(false) {
+	  pulse_state_(false),
+	  last_voltage_print_ms_(0) {
 	waveform_start_time_ = get_absolute_time();
 }
 
@@ -37,17 +38,21 @@ void Outputs::init() {
 	// Initialize audio/CV outputs with default pins
 	if (!audio_cv_out_.init()) {
 		printf("WARNING: Failed to initialize audio/CV outputs\n");
+	} else {
+		printf("Audio/CV outputs initialized successfully\n");
 	}
 
 	// Initialize pulse output
 	pulse_.begin();
 	pulse_.set(false);  // Start with pulse low
+	printf("Pulse output initialized\n");
 
 	// Set default DC coupling
 	audio_cv_out_.set_coupling(brain::io::AudioCvOutChannel::kChannelA,
 	                            brain::io::AudioCvOutCoupling::kDcCoupled);
 	audio_cv_out_.set_coupling(brain::io::AudioCvOutChannel::kChannelB,
 	                            brain::io::AudioCvOutCoupling::kDcCoupled);
+	printf("Default coupling: DC\n");
 
 	printf("Outputs initialized\n");
 }
@@ -89,7 +94,25 @@ void Outputs::set_selected_output(SelectedOutput selected) {
 		last_phase_ms_ = 0;
 		pulse_state_ = false;
 
-		printf("Output selected: %d\n", (int)selected);
+		// Print selection change
+		const char* output_name;
+		switch (selected) {
+			case SelectedOutput::NONE:
+				output_name = "NONE";
+				break;
+			case SelectedOutput::AUDIO_A:
+				output_name = "AUDIO_A (1Hz triangle wave)";
+				break;
+			case SelectedOutput::AUDIO_B:
+				output_name = "AUDIO_B (1Hz triangle wave)";
+				break;
+			case SelectedOutput::PULSE:
+				output_name = "PULSE (1Hz square wave)";
+				break;
+			default:
+				output_name = "UNKNOWN";
+		}
+		printf("\nOutput selected: %s\n", output_name);
 	}
 }
 
@@ -187,6 +210,13 @@ void Outputs::generate_triangle_wave(brain::io::AudioCvOutChannel channel) {
 
 	// Set DAC output
 	audio_cv_out_.set_voltage(channel, voltage);
+
+	// Print periodic voltage updates
+	if (phase_ms - last_voltage_print_ms_ >= VOLTAGE_PRINT_INTERVAL_MS) {
+		const char* channel_name = (channel == brain::io::AudioCvOutChannel::kChannelA) ? "A" : "B";
+		printf("Output %s: %.2fV (phase: %dms/%dms)\r", channel_name, voltage, phase_ms, WAVEFORM_PERIOD_MS);
+		last_voltage_print_ms_ = phase_ms;
+	}
 }
 
 void Outputs::generate_square_wave() {
@@ -202,6 +232,7 @@ void Outputs::generate_square_wave() {
 	if (new_state != pulse_state_) {
 		pulse_state_ = new_state;
 		pulse_.set(pulse_state_);
+		printf("Pulse output: %s (phase: %dms/%dms)\n", pulse_state_ ? "HIGH" : "LOW", phase_ms, WAVEFORM_PERIOD_MS);
 	}
 }
 

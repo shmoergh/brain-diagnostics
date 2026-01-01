@@ -109,10 +109,14 @@ private:
 	uint32_t last_phase_ms_;  // Track phase in milliseconds for waveform generation
 	bool pulse_state_;  // Current state for square wave
 
+	// Diagnostic output tracking
+	uint32_t last_voltage_print_ms_;  // Track when we last printed voltage
+
 	// Waveform parameters
 	static constexpr uint32_t WAVEFORM_PERIOD_MS = 1000;  // 1Hz = 1000ms period
 	static constexpr float MIN_VOLTAGE = 0.0f;
 	static constexpr float MAX_VOLTAGE = 10.0f;
+	static constexpr uint32_t VOLTAGE_PRINT_INTERVAL_MS = 100;  // Print voltage every 100ms
 
 	// Helper methods
 	void generate_triangle_wave(brain::io::AudioCvOutChannel channel);

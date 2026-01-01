@@ -24,7 +24,9 @@
 
 Inputs::Inputs()
 	: selected_input_(SelectedInput::NONE),
-	  vu_peak_hold_(0) {
+	  vu_peak_hold_(0),
+	  last_pulse_state_(false),
+	  pulse_state_initialized_(false) {
 	vu_peak_time_ = get_absolute_time();
 }
 
@@ -34,10 +36,13 @@ void Inputs::init() {
 	// Initialize audio/CV inputs
 	if (!audio_cv_in_.init()) {
 		printf("WARNING: Failed to initialize audio/CV inputs\n");
+	} else {
+		printf("Audio/CV inputs initialized successfully\n");
 	}
 
 	// Initialize pulse input
 	pulse_.begin();
+	printf("Pulse input initialized\n");
 
 	printf("Inputs initialized\n");
 }
@@ -56,6 +61,29 @@ void Inputs::set_selected_input(SelectedInput selected) {
 		// Reset VU meter state when switching inputs
 		vu_peak_hold_ = 0;
 		vu_peak_time_ = get_absolute_time();
+
+		// Reset pulse state tracking when switching inputs
+		pulse_state_initialized_ = false;
+
+		// Print selection change
+		const char* input_name;
+		switch (selected) {
+			case SelectedInput::NONE:
+				input_name = "NONE";
+				break;
+			case SelectedInput::AUDIO_A:
+				input_name = "AUDIO_A";
+				break;
+			case SelectedInput::AUDIO_B:
+				input_name = "AUDIO_B";
+				break;
+			case SelectedInput::PULSE:
+				input_name = "PULSE";
+				break;
+			default:
+				input_name = "UNKNOWN";
+		}
+		printf("\nInput selected: %s\n", input_name);
 	}
 }
 
@@ -95,14 +123,30 @@ uint8_t Inputs::get_vu_meter_level() {
 		raw_adc = audio_cv_in_.get_raw_channel_b();
 	}
 
-	printf("Raw ADC: %u\r", raw_adc);
-
 	// Calculate VU level with peak hold
-	return calculate_vu_level(raw_adc);
+	uint8_t vu_level = calculate_vu_level(raw_adc);
+
+	printf("Raw ADC: %4u | VU Level: %u/6\r", raw_adc, vu_level);
+
+	return vu_level;
 }
 
 bool Inputs::is_pulse_high() {
-	return pulse_.read();
+	bool current_state = pulse_.read();
+
+	// Track state changes and print diagnostic info when pulse input is selected
+	if (selected_input_ == SelectedInput::PULSE) {
+		if (!pulse_state_initialized_) {
+			printf("Pulse state: %s\n", current_state ? "HIGH" : "LOW");
+			last_pulse_state_ = current_state;
+			pulse_state_initialized_ = true;
+		} else if (current_state != last_pulse_state_) {
+			printf("\nPulse state changed: %s\n", current_state ? "HIGH" : "LOW");
+			last_pulse_state_ = current_state;
+		}
+	}
+
+	return current_state;
 }
 
 uint8_t Inputs::get_selection_indicator_leds() {

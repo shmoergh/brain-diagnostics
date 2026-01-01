@@ -85,6 +85,10 @@ private:
 
 	// Pot value cache
 	uint16_t pot_values_[3];
+
+	// Track last reported pot values for diagnostic output
+	uint16_t last_reported_pot_values_[3];
+	static constexpr uint8_t POT_CHANGE_THRESHOLD = 5;  // Report when pot changes by 5 or more
 };
 
 #endif  // POTS_AND_BUTTONS_H_

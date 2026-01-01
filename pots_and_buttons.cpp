@@ -23,6 +23,7 @@ PotsAndButtons::PotsAndButtons()
 	// Initialize pot values to 0
 	for (uint8_t i = 0; i < 3; i++) {
 		pot_values_[i] = 0;
+		last_reported_pot_values_[i] = 0;
 	}
 }
 
@@ -40,18 +41,22 @@ void PotsAndButtons::init() {
 	// Set up button press callbacks to track state
 	button1_.set_on_press([this]() {
 		button1_pressed_ = true;
+		printf("Button 1 pressed\n");
 	});
 
 	button1_.set_on_release([this]() {
 		button1_pressed_ = false;
+		printf("Button 1 released\n");
 	});
 
 	button2_.set_on_press([this]() {
 		button2_pressed_ = true;
+		printf("Button 2 pressed\n");
 	});
 
 	button2_.set_on_release([this]() {
 		button2_pressed_ = false;
+		printf("Button 2 released\n");
 	});
 
 	printf("Potentiometers and buttons initialized\n");
@@ -65,9 +70,19 @@ void PotsAndButtons::update() {
 	// Scan potentiometers for changes (non-blocking)
 	pots_.scan();
 
-	// Cache pot values for quick access
+	// Cache pot values for quick access and report significant changes
 	for (uint8_t i = 0; i < 3; i++) {
-		pot_values_[i] = pots_.get(i);
+		uint16_t new_value = pots_.get(i);
+		pot_values_[i] = new_value;
+
+		// Report significant changes in pot values
+		int16_t change = new_value - last_reported_pot_values_[i];
+		if (change < 0) change = -change;  // Absolute value
+
+		if (change >= POT_CHANGE_THRESHOLD) {
+			printf("Pot %d: %d (LEDs: %d/6)\n", i + 1, new_value, map_pot_to_leds(i));
+			last_reported_pot_values_[i] = new_value;
+		}
 	}
 }
 

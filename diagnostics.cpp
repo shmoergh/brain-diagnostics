@@ -47,7 +47,13 @@ Diagnostics::Diagnostics()
 }
 
 void Diagnostics::init() {
-	printf("Brain Diagnostics Firmware\n");
+	printf("\n");
+	printf("==============================================\n");
+	printf("    Brain Board Diagnostics Firmware\n");
+	printf("==============================================\n");
+	printf("Version: 1.0\n");
+	printf("Board: Brain (Raspberry Pi Pico)\n");
+	printf("==============================================\n\n");
 	printf("Initializing hardware...\n");
 
 	// Initialize LEDs
@@ -139,8 +145,18 @@ void Diagnostics::test_led_brightness() {
 				// Finished all LEDs
 				printf("LED brightness test complete\n");
 				printf("LED diagnostics passed!\n");
-				printf("\nEntering interactive mode...\n");
-				printf("(Interactive features will be added in later milestones)\n");
+				printf("\n==============================================\n");
+				printf("Entering interactive mode...\n");
+				printf("==============================================\n\n");
+				printf("USAGE:\n");
+				printf("- Turn pots to see LED feedback\n");
+				printf("- Press buttons to light all LEDs\n");
+				printf("- Hold BOTH buttons + turn pot 1 to select INPUT\n");
+				printf("- Hold BOTH buttons + turn pot 2 to select OUTPUT\n");
+				printf("- Hold BOTH buttons + turn pot 3 to select coupling (AC/DC)\n");
+				printf("- Release buttons to confirm selection\n");
+				printf("\nMonitor this serial output for detailed diagnostics!\n");
+				printf("==============================================\n\n");
 
 				// All LEDs off after testing
 				leds_.off_all();
@@ -208,11 +224,13 @@ void Diagnostics::interactive_mode() {
 	} else {
 		// Check if we just released buttons after selection
 		if (both_buttons_held_) {
-			// Buttons just released
+			// Buttons just released - print current configuration
+			printf("\n=== Configuration ===\n");
 			printf("Input: %d, Output: %d, Coupling: %s\n",
 			       (int)inputs_.get_selected_input(),
 			       (int)outputs_.get_selected_output(),
 			       outputs_.is_ac_coupled() ? "AC" : "DC");
+			printf("====================\n");
 			both_buttons_held_ = false;
 		}
 

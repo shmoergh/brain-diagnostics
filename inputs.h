@@ -111,6 +111,10 @@ private:
 	absolute_time_t vu_peak_time_;
 	static constexpr uint32_t VU_PEAK_HOLD_MS = 100;  // Hold peaks for 100ms
 
+	// Pulse state tracking for change detection
+	bool last_pulse_state_;
+	bool pulse_state_initialized_;
+
 	// Helper methods
 	uint8_t calculate_vu_level(uint16_t raw_adc);
 };
