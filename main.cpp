@@ -1,14 +1,17 @@
 #include <pico/stdlib.h>
 #include <stdio.h>
-
-const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+#include "diagnostics.h"
 
 int main() {
 	stdio_init_all();
 
-	// Initialize LEDs
-	while (true) {
+	// Create and initialize diagnostics system
+	Diagnostics diagnostics;
+	diagnostics.init();
 
+	// Main loop
+	while (true) {
+		diagnostics.update();
 	}
 
 	return 0;

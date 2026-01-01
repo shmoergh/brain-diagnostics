@@ -11,7 +11,10 @@ pico_sdk_init()
 # Add brain-sdk which includes brain libraries
 add_subdirectory(brain-sdk)
 
-add_executable(brain-diagnostics main.cpp)
+add_executable(brain-diagnostics
+	main.cpp
+	diagnostics.cpp
+)
 
 target_link_libraries(brain-diagnostics
 	pico_stdlib
