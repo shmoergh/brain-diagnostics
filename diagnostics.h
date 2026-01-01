@@ -4,6 +4,7 @@
 #include <pico/stdlib.h>
 #include <brain-ui/leds.h>
 #include "pots_and_buttons.h"
+#include "inputs.h"
 
 /**
  * @brief Main diagnostics application class for Brain board hardware testing
@@ -45,10 +46,13 @@ private:
 	// Helper methods
 	void delay_ms(uint32_t ms);
 	void update_leds_from_pots_and_buttons();
+	void handle_input_selection();
+	void handle_input_testing();
 
 	// Components
 	brain::ui::Leds leds_;
 	PotsAndButtons pots_and_buttons_;
+	Inputs inputs_;
 
 	// State tracking
 	enum class State {
@@ -64,6 +68,10 @@ private:
 	uint8_t current_brightness_step_;
 	absolute_time_t last_update_time_;
 	uint8_t startup_animation_count_;
+
+	// Input selection state
+	bool both_buttons_held_;
+	Inputs::SelectedInput last_selected_input_;
 };
 
 #endif  // DIAGNOSTICS_H_

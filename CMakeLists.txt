@@ -15,6 +15,7 @@ add_executable(brain-diagnostics
 	main.cpp
 	diagnostics.cpp
 	pots_and_buttons.cpp
+	inputs.cpp
 )
 
 target_link_libraries(brain-diagnostics

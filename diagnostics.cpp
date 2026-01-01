@@ -19,7 +19,9 @@ Diagnostics::Diagnostics()
 	: current_state_(State::LED_STARTUP_ANIMATION),
 	  current_led_(0),
 	  current_brightness_step_(0),
-	  startup_animation_count_(0) {
+	  startup_animation_count_(0),
+	  both_buttons_held_(false),
+	  last_selected_input_(Inputs::SelectedInput::NONE) {
 }
 
 void Diagnostics::init() {
@@ -32,6 +34,9 @@ void Diagnostics::init() {
 
 	// Initialize potentiometers and buttons
 	pots_and_buttons_.init();
+
+	// Initialize inputs (audio/CV and pulse)
+	inputs_.init();
 
 	// Start LED testing
 	current_state_ = State::LED_STARTUP_ANIMATION;
@@ -128,11 +133,36 @@ void Diagnostics::delay_ms(uint32_t ms) {
 }
 
 void Diagnostics::interactive_mode() {
-	// Update pots and buttons state (non-blocking)
+	// Update all components (non-blocking)
 	pots_and_buttons_.update();
+	inputs_.update();
 
-	// Update LED display based on pot and button state
-	update_leds_from_pots_and_buttons();
+	// Check if both buttons are held
+	bool both_held = pots_and_buttons_.is_button1_pressed() &&
+	                 pots_and_buttons_.is_button2_pressed();
+
+	if (both_held) {
+		// Input selection mode - use first knob to select input
+		handle_input_selection();
+		both_buttons_held_ = true;
+	} else {
+		// Check if we just released buttons after selection
+		if (both_buttons_held_) {
+			// Buttons just released - activate the selected input
+			Inputs::SelectedInput selected = inputs_.get_selected_input();
+			printf("Input selection: %d\n", (int)selected);
+			both_buttons_held_ = false;
+		}
+
+		// Check if an input is selected for testing
+		if (inputs_.get_selected_input() != Inputs::SelectedInput::NONE) {
+			// Show input testing (VU meter or pulse)
+			handle_input_testing();
+		} else {
+			// Normal pot and button mode
+			update_leds_from_pots_and_buttons();
+		}
+	}
 }
 
 void Diagnostics::update_leds_from_pots_and_buttons() {
@@ -164,6 +194,55 @@ void Diagnostics::update_leds_from_pots_and_buttons() {
 			leds_.on(i);
 		} else {
 			leds_.off(i);
+		}
+	}
+}
+
+void Diagnostics::handle_input_selection() {
+	// Get first pot value (0-127)
+	uint16_t pot_value = pots_and_buttons_.get_pot_value(0);
+
+	// Map pot to input selection
+	Inputs::SelectedInput selected = inputs_.map_pot_to_input_selection(pot_value);
+
+	// Update selected input
+	inputs_.set_selected_input(selected);
+
+	// Show selection on LEDs
+	uint8_t num_leds = inputs_.get_selection_indicator_leds();
+
+	// Update LEDs to show selection
+	for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+		if (i < num_leds) {
+			leds_.on(i);
+		} else {
+			leds_.off(i);
+		}
+	}
+}
+
+void Diagnostics::handle_input_testing() {
+	Inputs::SelectedInput selected = inputs_.get_selected_input();
+
+	if (selected == Inputs::SelectedInput::AUDIO_A ||
+	    selected == Inputs::SelectedInput::AUDIO_B) {
+		// Show VU meter for audio inputs
+		uint8_t vu_level = inputs_.get_vu_meter_level();
+
+		// Update LEDs to show VU meter
+		for (uint8_t i = 0; i < brain::ui::NO_OF_LEDS; i++) {
+			if (i < vu_level) {
+				leds_.on(i);
+			} else {
+				leds_.off(i);
+			}
+		}
+	} else if (selected == Inputs::SelectedInput::PULSE) {
+		// Show pulse state
+		if (inputs_.is_pulse_high()) {
+			leds_.on_all();
+		} else {
+			leds_.off_all();
 		}
 	}
 }
