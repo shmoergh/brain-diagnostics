@@ -1,3 +1,24 @@
+/**
+ * @file diagnostics.cpp
+ * @brief Main diagnostics application implementation for Brain board hardware testing
+ *
+ * This file implements the complete diagnostics workflow including:
+ * - LED startup and brightness testing (Milestone 1)
+ * - Potentiometer and button testing (Milestone 2)
+ * - Audio/CV and pulse input testing with VU meter (Milestone 3)
+ * - Audio/CV and pulse output testing with waveform generation (Milestone 4)
+ *
+ * The implementation uses a state machine for LED testing, then enters an
+ * interactive mode where users can test any component by selecting it with
+ * the buttons and potentiometers.
+ *
+ * Key design principles:
+ * - Non-blocking: no sleep() functions, all timing uses get_absolute_time()
+ * - Minimal floating point: only where required by SDK APIs
+ * - Component-based architecture: separate classes for inputs/outputs/pots/buttons
+ * - Optimized for original Pico (not Pico 2)
+ */
+
 #include "diagnostics.h"
 #include <stdio.h>
 
@@ -20,9 +41,7 @@ Diagnostics::Diagnostics()
 	  current_led_(0),
 	  current_brightness_step_(0),
 	  startup_animation_count_(0),
-	  both_buttons_held_(false),
-	  last_selected_input_(Inputs::SelectedInput::NONE),
-	  last_selected_output_(Outputs::SelectedOutput::NONE) {
+	  both_buttons_held_(false) {
 }
 
 void Diagnostics::init() {
@@ -132,10 +151,6 @@ void Diagnostics::test_led_brightness() {
 	}
 }
 
-void Diagnostics::delay_ms(uint32_t ms) {
-	sleep_ms(ms);
-}
-
 void Diagnostics::interactive_mode() {
 	// Update all components (non-blocking)
 	pots_and_buttons_.update();
@@ -147,20 +162,34 @@ void Diagnostics::interactive_mode() {
 	                 pots_and_buttons_.is_button2_pressed();
 
 	if (both_held) {
-		// Selection mode - use knobs to select input or output
-		// First knob = input selection, second knob = output selection
-		// Determine which knob is being used by checking which has changed more recently
+		// Selection mode - use knobs to select input, output, or coupling
+		// First knob = input selection
+		// Second knob = output selection
+		// Third knob = AC/DC coupling
 
 		uint16_t pot0 = pots_and_buttons_.get_pot_value(0);
 		uint16_t pot1 = pots_and_buttons_.get_pot_value(1);
+		uint16_t pot2 = pots_and_buttons_.get_pot_value(2);
 
-		// Use second knob for output selection if it's not at zero
-		if (pot1 > 5) {  // Small threshold to avoid noise
+		// Determine which knob is being used based on which is not at zero
+		// Priority: third knob > second knob > first knob (right to left)
+		if (pot2 > 5) {  // Small threshold to avoid noise
+			// Third knob controls AC/DC coupling
+			update_coupling_from_pot();
+			// Show coupling state on LEDs (0 LEDs = DC, all LEDs = AC)
+			if (outputs_.is_ac_coupled()) {
+				leds_.on_all();
+			} else {
+				leds_.off_all();
+			}
+		} else if (pot1 > 5) {
+			// Second knob controls output selection
 			handle_output_selection();
 		} else if (pot0 > 0) {
+			// First knob controls input selection
 			handle_input_selection();
 		} else {
-			// Both at zero, show no selection
+			// All at zero, show no selection
 			leds_.off_all();
 		}
 
@@ -169,25 +198,22 @@ void Diagnostics::interactive_mode() {
 		// Check if we just released buttons after selection
 		if (both_buttons_held_) {
 			// Buttons just released
-			printf("Input: %d, Output: %d\n",
+			printf("Input: %d, Output: %d, Coupling: %s\n",
 			       (int)inputs_.get_selected_input(),
-			       (int)outputs_.get_selected_output());
+			       (int)outputs_.get_selected_output(),
+			       outputs_.is_ac_coupled() ? "AC" : "DC");
 			both_buttons_held_ = false;
 		}
 
-		// Update AC/DC coupling with third knob if an audio output is selected
-		if (outputs_.get_selected_output() == Outputs::SelectedOutput::AUDIO_A ||
-		    outputs_.get_selected_output() == Outputs::SelectedOutput::AUDIO_B) {
-			update_coupling_from_pot();
-		}
-
-		// Priority: output testing > input testing > normal mode
-		if (outputs_.get_selected_output() != Outputs::SelectedOutput::NONE) {
-			// Output testing mode - generate waveforms
-			handle_output_testing();
-		} else if (inputs_.get_selected_input() != Inputs::SelectedInput::NONE) {
+		// Priority: input testing > output testing > normal mode
+		// This allows loopback testing (select output to generate, select input to see VU meter)
+		if (inputs_.get_selected_input() != Inputs::SelectedInput::NONE) {
 			// Input testing mode - show VU meter or pulse
+			// (Output will still generate if selected, via outputs_.update())
 			handle_input_testing();
+		} else if (outputs_.get_selected_output() != Outputs::SelectedOutput::NONE) {
+			// Output testing mode - show output indicator
+			handle_output_testing();
 		} else {
 			// Normal pot and button mode
 			update_leds_from_pots_and_buttons();
@@ -286,11 +312,6 @@ void Diagnostics::handle_output_selection() {
 
 	// Update selected output
 	outputs_.set_selected_output(selected);
-
-	// Clear any selected input when selecting output
-	if (selected != Outputs::SelectedOutput::NONE) {
-		inputs_.set_selected_input(Inputs::SelectedInput::NONE);
-	}
 
 	// Show selection on LEDs
 	uint8_t num_leds = outputs_.get_selection_indicator_leds();

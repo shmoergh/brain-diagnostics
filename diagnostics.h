@@ -37,7 +37,6 @@ public:
 
 private:
 	// LED testing methods
-	void test_leds();
 	void test_led_startup_animation();
 	void test_led_brightness();
 
@@ -45,7 +44,6 @@ private:
 	void interactive_mode();
 
 	// Helper methods
-	void delay_ms(uint32_t ms);
 	void update_leds_from_pots_and_buttons();
 	void handle_input_selection();
 	void handle_input_testing();
@@ -76,8 +74,6 @@ private:
 
 	// Input/output selection state
 	bool both_buttons_held_;
-	Inputs::SelectedInput last_selected_input_;
-	Outputs::SelectedOutput last_selected_output_;
 };
 
 #endif  // DIAGNOSTICS_H_

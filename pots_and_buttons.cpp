@@ -1,3 +1,17 @@
+/**
+ * @file pots_and_buttons.cpp
+ * @brief Component class for managing potentiometers and buttons
+ *
+ * Wraps Brain SDK's Pots and Button classes to provide a unified interface
+ * for reading all 3 potentiometers and 2 buttons. Handles value caching,
+ * button state tracking via callbacks, and LED mapping.
+ *
+ * Design notes:
+ * - Uses Brain SDK's built-in debouncing for buttons
+ * - Caches pot values for quick access without repeated ADC reads
+ * - All operations are non-blocking
+ */
+
 #include "pots_and_buttons.h"
 #include <stdio.h>
 

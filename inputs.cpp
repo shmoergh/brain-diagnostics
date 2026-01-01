@@ -1,3 +1,23 @@
+/**
+ * @file inputs.cpp
+ * @brief Component class for managing audio/CV and pulse inputs
+ *
+ * Wraps Brain SDK's AudioCvIn and Pulse classes to provide input testing
+ * functionality. Implements VU meter visualization for audio inputs and
+ * pulse detection for digital input.
+ *
+ * VU Meter Implementation:
+ * - Handles DC-coupled inputs by measuring deviation from center (2048)
+ * - Peak hold with gradual decay for smooth visualization
+ * - Maps 12-bit ADC (0-4095) to 6 LED levels
+ * - Uses integer-only arithmetic for performance
+ *
+ * Design notes:
+ * - All operations are non-blocking
+ * - Input selection uses pot value ranges (0%, 0-33%, 33-66%, 66-100%)
+ * - Can be used simultaneously with outputs for loopback testing
+ */
+
 #include "inputs.h"
 #include <stdio.h>
 #include <brain-common/brain-common.h>

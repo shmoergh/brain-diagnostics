@@ -1,3 +1,25 @@
+/**
+ * @file outputs.cpp
+ * @brief Component class for managing audio/CV and pulse outputs
+ *
+ * Wraps Brain SDK's AudioCvOut (DAC-based) and Pulse classes to provide
+ * output testing functionality. Generates 1Hz test waveforms for verification.
+ *
+ * Waveform Generation:
+ * - Triangle wave for audio/CV: 0-10V, 1Hz (chose triangle over sine for CPU efficiency)
+ * - Square wave for pulse: 1Hz digital signal
+ * - Time-based generation using get_absolute_time()
+ * - Updates only when millisecond phase changes (reduces CPU load)
+ * - Minimal floating point (only for voltage, required by DAC API)
+ *
+ * Design notes:
+ * - AC/DC coupling controlled by third pot (< 50% = DC, >= 50% = AC)
+ * - Requires holding both buttons to adjust coupling
+ * - All operations are non-blocking
+ * - Output selection uses pot value ranges (same as inputs)
+ * - Can be used simultaneously with inputs for loopback testing
+ */
+
 #include "outputs.h"
 #include <stdio.h>
 
