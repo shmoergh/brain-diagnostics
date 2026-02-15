@@ -23,8 +23,8 @@
 #include "outputs.h"
 #include <stdio.h>
 
-Outputs::Outputs(brain::io::PulseOutput* pulse_output)
-	: pulse_output_(pulse_output),
+Outputs::Outputs(brain::io::Pulse* pulse)
+	: pulse_(pulse),
 	  selected_output_(SelectedOutput::NONE),
 	  ac_coupled_(false),
 	  last_phase_ms_(0),
@@ -44,8 +44,8 @@ void Outputs::init() {
 	}
 
 	// Pulse is initialized externally - set initial state
-	pulse_output_->set(false);  // Start with pulse low
-	printf("Pulse output ready (dedicated instance)\n");
+	pulse_->set(false);  // Start with pulse low
+	printf("Pulse output ready (shared pulse instance)\n");
 
 	// Set default DC coupling
 	audio_cv_out_.set_coupling(brain::io::AudioCvOutChannel::kChannelA,
@@ -233,7 +233,7 @@ void Outputs::generate_square_wave() {
 	// Only update if state changed
 	if (new_state != pulse_state_) {
 		pulse_state_ = new_state;
-		pulse_output_->set(pulse_state_);
+		pulse_->set(pulse_state_);
 		printf("[OUTPUT] Pulse output: %s (phase: %dms/%dms)\n", pulse_state_ ? "HIGH" : "LOW", phase_ms, WAVEFORM_PERIOD_MS);
 	}
 }
@@ -245,6 +245,6 @@ void Outputs::stop_all_outputs() {
 	audio_cv_out_.set_voltage(brain::io::AudioCvOutChannel::kChannelB, stop_voltage);
 
 	// Set pulse output low
-	pulse_output_->set(false);
+	pulse_->set(false);
 	pulse_state_ = false;
 }

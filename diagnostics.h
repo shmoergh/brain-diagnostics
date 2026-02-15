@@ -3,8 +3,7 @@
 
 #include <pico/stdlib.h>
 #include <brain-ui/leds.h>
-#include <brain-io/pulse-input.h>
-#include <brain-io/pulse-output.h>
+#include <brain-io/pulse.h>
 #include "pots_and_buttons.h"
 #include "inputs.h"
 #include "outputs.h"
@@ -54,8 +53,7 @@ private:
 	// Components
 	brain::ui::Leds leds_;
 	PotsAndButtons pots_and_buttons_;
-	brain::io::PulseInput pulse_input_;   // Dedicated pulse input instance
-	brain::io::PulseOutput pulse_output_;  // Dedicated pulse output instance
+	brain::io::Pulse pulse_;  // Shared pulse I/O instance
 	Inputs inputs_;
 	Outputs outputs_;
 

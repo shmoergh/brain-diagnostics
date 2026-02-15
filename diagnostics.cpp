@@ -37,8 +37,8 @@ constexpr uint32_t STARTUP_ANIMATION_DELAY = 1000;
 constexpr uint32_t BRIGHTNESS_TEST_DELAY = 500;
 
 Diagnostics::Diagnostics()
-	: inputs_(&pulse_input_),
-	  outputs_(&pulse_output_),
+	: inputs_(&pulse_),
+	  outputs_(&pulse_),
 	  current_state_(State::LED_STARTUP_ANIMATION),
 	  current_led_(0),
 	  current_brightness_step_(0),
@@ -65,12 +65,9 @@ void Diagnostics::init() {
 	// Initialize potentiometers and buttons
 	pots_and_buttons_.init();
 
-	// Initialize separate pulse instances for input and output
-	pulse_input_.begin();
-	printf("Pulse input initialized\n");
-
-	pulse_output_.begin();
-	printf("Pulse output initialized\n");
+	// Initialize shared pulse instance
+	pulse_.begin();
+	printf("Pulse I/O initialized\n");
 
 	// Initialize inputs (audio/CV and pulse)
 	inputs_.init();

@@ -3,7 +3,7 @@
 
 #include <pico/stdlib.h>
 #include <brain-io/audio-cv-in.h>
-#include <brain-io/pulse-input.h>
+#include <brain-io/pulse.h>
 
 /**
  * @brief Component class for managing audio/CV and pulse inputs
@@ -26,9 +26,9 @@ public:
 	/**
 	 * @brief Construct a new Inputs object
 	 *
-	 * @param pulse_input Dedicated pulse input instance for reading pulse input
+	 * @param pulse Shared pulse instance for reading pulse input
 	 */
-	Inputs(brain::io::PulseInput* pulse_input);
+	Inputs(brain::io::Pulse* pulse);
 
 	/**
 	 * @brief Initialize audio/CV inputs
@@ -105,7 +105,7 @@ public:
 
 private:
 	brain::io::AudioCvIn audio_cv_in_;
-	brain::io::PulseInput* pulse_input_;  // Pointer to dedicated pulse input instance
+	brain::io::Pulse* pulse_;  // Pointer to shared pulse instance
 
 	SelectedInput selected_input_;
 

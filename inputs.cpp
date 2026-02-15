@@ -22,8 +22,8 @@
 #include <stdio.h>
 #include <brain-common/brain-common.h>
 
-Inputs::Inputs(brain::io::PulseInput* pulse_input)
-	: pulse_input_(pulse_input),
+Inputs::Inputs(brain::io::Pulse* pulse)
+	: pulse_(pulse),
 	  selected_input_(SelectedInput::NONE),
 	  vu_peak_hold_(0),
 	  last_pulse_state_(false),
@@ -42,7 +42,7 @@ void Inputs::init() {
 	}
 
 	// Pulse is initialized externally - just log
-	printf("Pulse input ready (shared instance)\n");
+	printf("Pulse input ready (shared pulse instance)\n");
 
 	printf("Inputs initialized\n");
 }
@@ -52,7 +52,7 @@ void Inputs::update() {
 	audio_cv_in_.update();
 
 	// Poll pulse input for edge detection (non-blocking)
-	pulse_input_->poll();
+	pulse_->poll();
 }
 
 void Inputs::set_selected_input(SelectedInput selected, bool print_change) {
@@ -134,8 +134,8 @@ uint8_t Inputs::get_vu_meter_level() {
 }
 
 bool Inputs::is_pulse_high() {
-	bool raw_gpio = pulse_input_->read_raw();
-	bool current_state = pulse_input_->read();
+	bool raw_gpio = pulse_->read_raw();
+	bool current_state = pulse_->read();
 
 	// Track state changes and print diagnostic info when pulse input is selected
 	if (selected_input_ == SelectedInput::PULSE) {

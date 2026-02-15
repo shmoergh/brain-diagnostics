@@ -3,7 +3,7 @@
 
 #include <pico/stdlib.h>
 #include <brain-io/audio-cv-out.h>
-#include <brain-io/pulse-output.h>
+#include <brain-io/pulse.h>
 
 /**
  * @brief Component class for managing audio/CV and pulse outputs
@@ -26,9 +26,9 @@ public:
 	/**
 	 * @brief Construct a new Outputs object
 	 *
-	 * @param pulse_output Dedicated pulse output instance for writing pulse output
+	 * @param pulse Shared pulse instance for writing pulse output
 	 */
-	Outputs(brain::io::PulseOutput* pulse_output);
+	Outputs(brain::io::Pulse* pulse);
 
 	/**
 	 * @brief Initialize audio/CV outputs
@@ -102,7 +102,7 @@ public:
 
 private:
 	brain::io::AudioCvOut audio_cv_out_;
-	brain::io::PulseOutput* pulse_output_;  // Pointer to dedicated pulse output instance
+	brain::io::Pulse* pulse_;  // Pointer to shared pulse instance
 
 	SelectedOutput selected_output_;
 	bool ac_coupled_;
