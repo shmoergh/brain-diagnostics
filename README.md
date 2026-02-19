@@ -60,11 +60,14 @@ Normal mode (both buttons not held):
 - If no input test is selected, LED bar follows the pot with the highest value.
 - If input test is selected, LEDs show input test data (VU or pulse state).
 - Output generation always runs independently in the background.
+- For `Output = AUDIO_A` or `AUDIO_B`, Pot 3 continuously controls output mode (no buttons required):
+  - `DC triangle`
+  - `AC triangle`
+  - `Fixed 0V` through `Fixed 10V` (1V steps)
 
 Selection mode (hold BOTH buttons):
 - Pot 1 selects **input source**
 - Pot 2 selects **output source**
-- Pot 3 selects **audio coupling** (DC below midpoint, AC at/above midpoint)
 - LEDs show a status map while held:
   - LED1 Input A
   - LED2 Input B
@@ -108,9 +111,11 @@ Note: in current selection mode implementation, input/output changes are applied
 ### Audio/CV outputs
 
 1. Set **Output = AUDIO_A** or **AUDIO_B**.
-2. Verify generated output waveform.
-3. Expected: 1 Hz triangle wave, 0-10V.
-4. Use pot 3 in selection mode to switch AC/DC coupling.
+2. Use Pot 3 to choose output mode (`DC triangle`, `AC triangle`, or fixed `0..10V`).
+3. Verify generated output:
+   - Triangle modes: 1 Hz triangle wave, 0-10V.
+   - Fixed modes: constant stepped voltage in 1V increments.
+4. During fixed modes, output is forced to DC behavior for CV calibration.
 
 ### Loopback test (recommended)
 

@@ -22,11 +22,29 @@
 
 #include "outputs.h"
 #include <stdio.h>
+#include <brain-utils/helpers.h>
+
+namespace {
+
+float fixed_voltage_from_mode(Outputs::AudioOutputMode mode) {
+	int mode_value = static_cast<int>(mode);
+	int voltage_step = mode_value - 2;
+	if (voltage_step < 0) {
+		voltage_step = 0;
+	} else if (voltage_step > 10) {
+		voltage_step = 10;
+	}
+	return static_cast<float>(voltage_step);
+}
+
+}  // namespace
 
 Outputs::Outputs(brain::io::Pulse* pulse)
 	: pulse_(pulse),
 	  selected_output_(SelectedOutput::NONE),
 	  ac_coupled_(false),
+	  audio_output_mode_(AudioOutputMode::kDcTriangle),
+	  last_reported_audio_output_mode_(AudioOutputMode::kDcTriangle),
 	  last_phase_ms_(0),
 	  pulse_state_(false),
 	  last_voltage_print_ms_(0) {
@@ -63,23 +81,30 @@ void Outputs::update() {
 		return;
 	}
 
-	// Generate appropriate waveform based on selected output
-	switch (selected_output_) {
-		case SelectedOutput::AUDIO_A:
-			generate_triangle_wave(brain::io::AudioCvOutChannel::kChannelA);
-			break;
-
-		case SelectedOutput::AUDIO_B:
-			generate_triangle_wave(brain::io::AudioCvOutChannel::kChannelB);
-			break;
-
-		case SelectedOutput::PULSE:
-			generate_square_wave();
-			break;
-
-		default:
-			break;
+	brain::io::AudioCvOutChannel channel;
+	if (selected_output_ == SelectedOutput::AUDIO_A) {
+		channel = brain::io::AudioCvOutChannel::kChannelA;
+	} else if (selected_output_ == SelectedOutput::AUDIO_B) {
+		channel = brain::io::AudioCvOutChannel::kChannelB;
+	} else {
+		generate_square_wave();
+		return;
 	}
+
+	if (audio_output_mode_ == AudioOutputMode::kDcTriangle) {
+		set_ac_coupling(false);
+		generate_triangle_wave(channel);
+		return;
+	}
+
+	if (audio_output_mode_ == AudioOutputMode::kAcTriangle) {
+		set_ac_coupling(true);
+		generate_triangle_wave(channel);
+		return;
+	}
+
+	set_ac_coupling(false);
+	generate_fixed_voltage(channel, fixed_voltage_from_mode(audio_output_mode_));
 }
 
 void Outputs::set_selected_output(SelectedOutput selected, bool print_change) {
@@ -102,10 +127,10 @@ void Outputs::set_selected_output(SelectedOutput selected, bool print_change) {
 					output_name = "NONE";
 					break;
 				case SelectedOutput::AUDIO_A:
-					output_name = "AUDIO_A (1Hz triangle wave)";
+					output_name = "AUDIO_A (Pot 3 mode)";
 					break;
 				case SelectedOutput::AUDIO_B:
-					output_name = "AUDIO_B (1Hz triangle wave)";
+					output_name = "AUDIO_B (Pot 3 mode)";
 					break;
 				case SelectedOutput::PULSE:
 					output_name = "PULSE (1Hz square wave)";
@@ -138,6 +163,44 @@ Outputs::SelectedOutput Outputs::map_pot_to_output_selection(uint16_t pot_value)
 	} else {
 		return SelectedOutput::PULSE;
 	}
+}
+
+Outputs::AudioOutputMode Outputs::map_pot_to_audio_output_mode(uint16_t pot_value) const {
+	// Pot value is 7-bit (0-127), map to 13 states (0-12)
+	long raw_state = map(pot_value, 0, 127, 0, 12);
+	int state = clamp(0, 12, static_cast<int>(raw_state));
+	return static_cast<AudioOutputMode>(state);
+}
+
+void Outputs::set_audio_output_mode(AudioOutputMode mode) {
+	audio_output_mode_ = mode;
+	if (audio_output_mode_ == last_reported_audio_output_mode_) {
+		return;
+	}
+
+	last_reported_audio_output_mode_ = audio_output_mode_;
+
+	if (selected_output_ != SelectedOutput::AUDIO_A &&
+	    selected_output_ != SelectedOutput::AUDIO_B) {
+		return;
+	}
+
+	const char* channel = (selected_output_ == SelectedOutput::AUDIO_A) ? "A" : "B";
+	if (audio_output_mode_ == AudioOutputMode::kDcTriangle) {
+		printf("[OUT-MODE] %s: DC TRIANGLE\n", channel);
+		return;
+	}
+
+	if (audio_output_mode_ == AudioOutputMode::kAcTriangle) {
+		printf("[OUT-MODE] %s: AC TRIANGLE\n", channel);
+		return;
+	}
+
+	printf("[OUT-MODE] %s: FIXED %.0fV\n", channel, fixed_voltage_from_mode(audio_output_mode_));
+}
+
+Outputs::AudioOutputMode Outputs::get_audio_output_mode() const {
+	return audio_output_mode_;
 }
 
 void Outputs::set_ac_coupling(bool use_ac_coupling) {
@@ -219,6 +282,17 @@ void Outputs::generate_triangle_wave(brain::io::AudioCvOutChannel channel) {
 		printf("Output %s: %.2fV (phase: %dms/%dms)\r", channel_name, voltage, phase_ms, WAVEFORM_PERIOD_MS);
 		last_voltage_print_ms_ = phase_ms;
 	}
+}
+
+void Outputs::generate_fixed_voltage(brain::io::AudioCvOutChannel channel, float voltage) {
+	brain::io::AudioCvOutChannel other_channel =
+		(channel == brain::io::AudioCvOutChannel::kChannelA)
+			? brain::io::AudioCvOutChannel::kChannelB
+			: brain::io::AudioCvOutChannel::kChannelA;
+
+	// Keep non-selected channel at safe idle level during calibration.
+	audio_cv_out_.set_voltage(other_channel, 5.0f);
+	audio_cv_out_.set_voltage(channel, voltage);
 }
 
 void Outputs::generate_square_wave() {

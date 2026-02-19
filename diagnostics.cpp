@@ -162,7 +162,8 @@ void Diagnostics::test_led_brightness() {
 				printf("  LED 4=Output A, LED 5=Output B, LED 6=Pulse Out\n");
 				printf("- Hold BOTH buttons + turn pot 1 to select INPUT\n");
 				printf("- Hold BOTH buttons + turn pot 2 to select OUTPUT\n");
-				printf("- Hold BOTH buttons + turn pot 3 to select coupling (AC/DC)\n");
+				printf("- NO buttons needed: turn pot 3 to set output mode for AUDIO_A/B:\n");
+				printf("  DC TRIANGLE -> AC TRIANGLE -> FIXED 0V..10V\n");
 				printf("- Release buttons to confirm selection\n");
 				printf("\nMonitor this serial output for detailed diagnostics!\n");
 				printf("==============================================\n\n");
@@ -182,21 +183,18 @@ void Diagnostics::interactive_mode() {
 	// Update all components (non-blocking)
 	pots_and_buttons_.update();
 	inputs_.update();
-	outputs_.update();  // Update waveform generation
 
 	// Check if both buttons are held
 	bool both_held = pots_and_buttons_.is_button1_pressed() &&
 	                 pots_and_buttons_.is_button2_pressed();
 
 	if (both_held) {
-		// Selection mode - use knobs to select input, output, or coupling
+		// Selection mode - use knobs to select input and output
 		// First knob = input selection
 		// Second knob = output selection
-		// Third knob = AC/DC coupling
 
 		uint16_t pot0 = pots_and_buttons_.get_pot_value(0);
 		uint16_t pot1 = pots_and_buttons_.get_pot_value(1);
-		uint16_t pot2 = pots_and_buttons_.get_pot_value(2);
 
 		// Update selections based on pot positions (all pots checked independently)
 		// Don't print selection changes while buttons held - only print final config on release
@@ -212,11 +210,6 @@ void Diagnostics::interactive_mode() {
 			outputs_.set_selected_output(selected, false);  // Don't print while selecting
 		}
 
-		// Third knob controls AC/DC coupling
-		if (pot2 > 5) {  // Small threshold to avoid noise
-			update_coupling_from_pot();
-		}
-
 		// Always show status display when both buttons are held
 		// This shows which inputs/outputs are currently active in real-time
 		show_status_display();
@@ -226,10 +219,58 @@ void Diagnostics::interactive_mode() {
 		// Check if we just released buttons after selection
 		if (both_buttons_held_) {
 			// Buttons just released - print current configuration
+			Outputs::AudioOutputMode audio_mode = outputs_.get_audio_output_mode();
+			const char* audio_mode_name;
+			switch (audio_mode) {
+				case Outputs::AudioOutputMode::kDcTriangle:
+					audio_mode_name = "DC_TRIANGLE";
+					break;
+				case Outputs::AudioOutputMode::kAcTriangle:
+					audio_mode_name = "AC_TRIANGLE";
+					break;
+				case Outputs::AudioOutputMode::kFixed0V:
+					audio_mode_name = "FIXED_0V";
+					break;
+				case Outputs::AudioOutputMode::kFixed1V:
+					audio_mode_name = "FIXED_1V";
+					break;
+				case Outputs::AudioOutputMode::kFixed2V:
+					audio_mode_name = "FIXED_2V";
+					break;
+				case Outputs::AudioOutputMode::kFixed3V:
+					audio_mode_name = "FIXED_3V";
+					break;
+				case Outputs::AudioOutputMode::kFixed4V:
+					audio_mode_name = "FIXED_4V";
+					break;
+				case Outputs::AudioOutputMode::kFixed5V:
+					audio_mode_name = "FIXED_5V";
+					break;
+				case Outputs::AudioOutputMode::kFixed6V:
+					audio_mode_name = "FIXED_6V";
+					break;
+				case Outputs::AudioOutputMode::kFixed7V:
+					audio_mode_name = "FIXED_7V";
+					break;
+				case Outputs::AudioOutputMode::kFixed8V:
+					audio_mode_name = "FIXED_8V";
+					break;
+				case Outputs::AudioOutputMode::kFixed9V:
+					audio_mode_name = "FIXED_9V";
+					break;
+				case Outputs::AudioOutputMode::kFixed10V:
+					audio_mode_name = "FIXED_10V";
+					break;
+				default:
+					audio_mode_name = "UNKNOWN";
+					break;
+			}
+
 			printf("\n=== Configuration ===\n");
-			printf("Input: %d, Output: %d, Coupling: %s\n",
+			printf("Input: %d, Output: %d, AudioMode: %s, Coupling: %s\n",
 			       (int)inputs_.get_selected_input(),
 			       (int)outputs_.get_selected_output(),
+			       audio_mode_name,
 			       outputs_.is_ac_coupled() ? "AC" : "DC");
 			printf("====================\n");
 
@@ -253,8 +294,19 @@ void Diagnostics::interactive_mode() {
 		}
 
 		// Output never affects LEDs - it only generates waveforms via outputs_.update()
-		// which is called at the top of interactive_mode()
+		// which is called at the end of interactive_mode()
 	}
+
+	// Pot 3 always controls AUDIO_A/B output mode as a 13-state ladder:
+	// DC triangle -> AC triangle -> fixed 0V..10V.
+	if (outputs_.get_selected_output() == Outputs::SelectedOutput::AUDIO_A ||
+	    outputs_.get_selected_output() == Outputs::SelectedOutput::AUDIO_B) {
+		uint16_t pot2 = pots_and_buttons_.get_pot_value(2);
+		outputs_.set_audio_output_mode(outputs_.map_pot_to_audio_output_mode(pot2));
+	}
+
+	// Update output waveform generation after all input/selection updates.
+	outputs_.update();
 }
 
 void Diagnostics::update_leds_from_pots_and_buttons() {
@@ -338,16 +390,6 @@ void Diagnostics::handle_input_testing() {
 			}
 		}
 	}
-}
-
-void Diagnostics::update_coupling_from_pot() {
-	// Get third pot value (0-127)
-	uint16_t pot_value = pots_and_buttons_.get_pot_value(2);
-
-	// Map to coupling: < 64 = DC, >= 64 = AC
-	bool use_ac = (pot_value >= 64);
-
-	outputs_.set_ac_coupling(use_ac);
 }
 
 void Diagnostics::show_status_display() {

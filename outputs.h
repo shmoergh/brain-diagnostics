@@ -14,6 +14,25 @@
 class Outputs {
 public:
 	/**
+	 * @brief Audio output mode controlled by Pot 3 when AUDIO_A/B is selected
+	 */
+	enum class AudioOutputMode {
+		kDcTriangle = 0,
+		kAcTriangle = 1,
+		kFixed0V = 2,
+		kFixed1V = 3,
+		kFixed2V = 4,
+		kFixed3V = 5,
+		kFixed4V = 6,
+		kFixed5V = 7,
+		kFixed6V = 8,
+		kFixed7V = 9,
+		kFixed8V = 10,
+		kFixed9V = 11,
+		kFixed10V = 12
+	};
+
+	/**
 	 * @brief Output selection options
 	 */
 	enum class SelectedOutput {
@@ -74,6 +93,29 @@ public:
 	SelectedOutput map_pot_to_output_selection(uint16_t pot_value);
 
 	/**
+	 * @brief Map Pot 3 value (0-127) to audio output mode (13 states)
+	 *
+	 * Mapping:
+	 * - 0: DC triangle
+	 * - 1: AC triangle
+	 * - 2..12: Fixed 0V..10V
+	 *
+	 * @param pot_value Pot value from 0-127
+	 * @return AudioOutputMode The mapped audio output mode
+	 */
+	AudioOutputMode map_pot_to_audio_output_mode(uint16_t pot_value) const;
+
+	/**
+	 * @brief Set current audio output mode for AUDIO_A/B outputs
+	 */
+	void set_audio_output_mode(AudioOutputMode mode);
+
+	/**
+	 * @brief Get current audio output mode for AUDIO_A/B outputs
+	 */
+	AudioOutputMode get_audio_output_mode() const;
+
+	/**
 	 * @brief Set AC/DC coupling for audio outputs
 	 *
 	 * @param use_ac_coupling true for AC coupling, false for DC coupling
@@ -106,6 +148,8 @@ private:
 
 	SelectedOutput selected_output_;
 	bool ac_coupled_;
+	AudioOutputMode audio_output_mode_;
+	AudioOutputMode last_reported_audio_output_mode_;
 
 	// Waveform generation state
 	absolute_time_t waveform_start_time_;
@@ -123,6 +167,7 @@ private:
 
 	// Helper methods
 	void generate_triangle_wave(brain::io::AudioCvOutChannel channel);
+	void generate_fixed_voltage(brain::io::AudioCvOutChannel channel, float voltage);
 	void generate_square_wave();
 	void stop_all_outputs();
 };
