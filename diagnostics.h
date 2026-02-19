@@ -47,7 +47,6 @@ private:
 	// Helper methods
 	void update_leds_from_pots_and_buttons();
 	void handle_input_testing();
-	void update_coupling_from_pot();
 	void show_status_display();
 
 	// Components
