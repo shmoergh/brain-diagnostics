@@ -61,6 +61,9 @@ void Diagnostics::init() {
 	// Initialize LEDs
 	leds_.init();
 	printf("LEDs initialized\n");
+	button_led_.init();
+	button_led_.off();
+	printf("Button LED initialized\n");
 
 	// Initialize potentiometers and buttons
 	pots_and_buttons_.init();
@@ -157,6 +160,7 @@ void Diagnostics::test_led_brightness() {
 				printf("USAGE:\n");
 				printf("- Turn pots to see LED feedback\n");
 				printf("- Press buttons to light all LEDs\n");
+				printf("- Press button 1 to test button LED (on while held)\n");
 				printf("- Hold BOTH buttons (no pots) to see STATUS DISPLAY:\n");
 				printf("  LED 1=Input A, LED 2=Input B, LED 3=Pulse In\n");
 				printf("  LED 4=Output A, LED 5=Output B, LED 6=Pulse Out\n");
@@ -183,6 +187,13 @@ void Diagnostics::interactive_mode() {
 	// Update all components (non-blocking)
 	pots_and_buttons_.update();
 	inputs_.update();
+
+	// Quick button LED test: button 1 pressed -> button LED on.
+	if (pots_and_buttons_.is_button1_pressed()) {
+		button_led_.on();
+	} else {
+		button_led_.off();
+	}
 
 	// Check if both buttons are held
 	bool both_held = pots_and_buttons_.is_button1_pressed() &&

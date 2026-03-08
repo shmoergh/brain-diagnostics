@@ -2,6 +2,7 @@
 #define DIAGNOSTICS_H_
 
 #include <pico/stdlib.h>
+#include <brain-ui/button-led.h>
 #include <brain-ui/leds.h>
 #include <brain-io/pulse.h>
 #include "pots_and_buttons.h"
@@ -51,6 +52,7 @@ private:
 
 	// Components
 	brain::ui::Leds leds_;
+	brain::ui::ButtonLed button_led_;
 	PotsAndButtons pots_and_buttons_;
 	brain::io::Pulse pulse_;  // Shared pulse I/O instance
 	Inputs inputs_;
