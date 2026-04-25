@@ -127,6 +127,18 @@ To actually trim the hardware: connect a multimeter (or scope set to DC) to one 
 
 Repeat for the other channel using its own trimmer.
 
+#### After the trimmer: run software calibration
+
+Once you've trimmed the hardware as close to 1 V per step as you can get, the next step is to run **software calibration**. The hardware trimmer sets the overall gain of the analog stage, but it can't compensate for non-linearities, op-amp offset, or per-step drift — those residuals are exactly what software calibration is for. Skipping this step means your CV outputs will still be a few tens of millivolts off at any given voltage, which is enough to throw off 1 V/octave pitch tracking.
+
+Software calibration is handled by a separate firmware called the **[Brain CV tuner](https://github.com/shmoergh/brain-cv-tuner)**. The workflow is:
+
+1. Flash the CV tuner firmware onto the Brain (drag-and-drop UF2, same as this firmware).
+2. Follow the CV tuner's README — it walks you through measuring each whole-volt step on a multimeter, entering the readings, and writing the resulting calibration table to the Brain's reserved flash sector.
+3. Once calibration is written, flash your real firmware back onto the board. The calibration sector is protected by the same flash-reservation mechanism this diagnostics firmware uses, so it survives subsequent firmware flashes as long as those firmwares also reserve it.
+
+After software calibration, your Brain's CV outputs will hit the asked-for voltage to within a fraction of a millivolt across the full range — good enough for accurate pitch tracking and any other CV use you care about.
+
 ## What to do if a test fails
 
 A failure on a single test usually points you at a specific component you can probe with a multimeter or a scope. A few common starting points:
