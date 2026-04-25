@@ -61,7 +61,7 @@ The six panel LEDs encode the test number, with **LED 1 as the least significant
 
 So, for example: if you press Button A and see **LEDs 1 and 4** lit, that's binary `001001` = 9, which means you're now on the **CV input 2** test. After ~0.8 seconds those LEDs go dark and the test takes over.
 
-## The 13 tests
+## The tests
 
 The order is fixed. You can't jump around — Button A only ever moves forward. (When you wrap past test 13, the next press takes you back to test 1.)
 
