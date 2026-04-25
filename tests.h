@@ -19,6 +19,7 @@ enum TestId : uint8_t {
     kTestCvOut1,
     kTestCvOut2,
     kTestPulseOut,
+    kTestCvOutCalibrate,
     kTestCount,
 };
 

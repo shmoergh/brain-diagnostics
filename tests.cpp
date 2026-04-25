@@ -94,6 +94,14 @@ void on_test_enter(Brain& brain, TestId test) {
         case kTestPulseOut:
             brain.outputs.pulse_set(false);
             break;
+        case kTestCvOutCalibrate:
+            // Hardware-trimmer test: bypass software calibration so the
+            // user trims the analog gain against the raw DAC output.
+            brain.outputs.set_output_range(kOutputsChannelA, kOutputsRange0To10V);
+            brain.outputs.set_output_range(kOutputsChannelB, kOutputsRange0To10V);
+            brain.outputs.set_voltage_millivolts(kOutputsChannelA, 0);
+            brain.outputs.set_voltage_millivolts(kOutputsChannelB, 0);
+            break;
         default:
             break;
     }
@@ -194,6 +202,29 @@ void run_test(Brain& brain, TestId test, uint32_t now_ms) {
                 brain.outputs.pulse_set(g_toggle_state);
             }
             break;
+
+        case kTestCvOutCalibrate: {
+            uint16_t p1 = brain.pots.get_buffered(0);
+            uint16_t p2 = brain.pots.get_buffered(1);
+            uint8_t step1 = static_cast<uint8_t>((p1 * 6u) / (kPotFullScale + 1u));
+            uint8_t step2 = static_cast<uint8_t>((p2 * 6u) / (kPotFullScale + 1u));
+            if (step1 > 5) step1 = 5;
+            if (step2 > 5) step2 = 5;
+
+            brain.outputs.set_voltage_millivolts(kOutputsChannelA,
+                static_cast<int32_t>(step1) * 1000);
+            brain.outputs.set_voltage_millivolts(kOutputsChannelB,
+                static_cast<int32_t>(step2) * 1000);
+
+            for (uint8_t i = 0; i < 6; ++i) {
+                uint16_t b = 0;
+                if (i == step1) b += 128;
+                if (i == step2) b += 127;
+                if (b > 255) b = 255;
+                brain.leds.set_brightness(i, static_cast<uint8_t>(b));
+            }
+            break;
+        }
 
         case kTestCount:
             break;

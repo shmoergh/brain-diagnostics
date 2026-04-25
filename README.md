@@ -1,6 +1,6 @@
 # Brain Diagnostics
 
-A manual hardware diagnostic firmware for the Brain Eurorack board. It supports both Brain variants — the original Pico 1 (RP2040) and the Pico 2 (RP2350). You flash this onto a freshly assembled Brain, plug it into USB, and then walk through thirteen tests one at a time by pressing a single button. There are no automated checks: the firmware drives the hardware in a known way, and you watch the LEDs and the oscilloscope to decide whether each component is healthy.
+A manual hardware diagnostic firmware for the Brain Eurorack board. It supports both Brain variants — the original Pico 1 (RP2040) and the Pico 2 (RP2350). You flash this onto a freshly assembled Brain, plug it into USB, and then walk through fourteen tests one at a time by pressing a single button. There are no automated checks: the firmware drives the hardware in a known way, and you watch the LEDs and the oscilloscope to decide whether each component is healthy.
 
 If you've just soldered together a Brain board and want to make sure every input, output, pot, button, and LED actually works before you move on to flashing your real firmware, this is the tool for that.
 
@@ -40,7 +40,7 @@ Button A itself doesn't need its own dedicated test — the simple fact that pre
 
 ## Reading the binary indicator
 
-The six panel LEDs encode the test number, with **LED 1 as the least significant bit** (rightmost in the binary number) and **LED 6 as the most significant**. The mapping for all 13 tests:
+The six panel LEDs encode the test number, with **LED 1 as the least significant bit** (rightmost in the binary number) and **LED 6 as the most significant**. The mapping for all 14 tests:
 
 | Test | # | Binary (LED 6 → LED 1) | LEDs lit |
 |------|---|------------------------|----------|
@@ -57,6 +57,7 @@ The six panel LEDs encode the test number, with **LED 1 as the least significant
 | CV output 1 | 11 | `001011` | LED 1, 2, 4 |
 | CV output 2 | 12 | `001100` | LED 3, 4 |
 | Pulse output | 13 | `001101` | LED 1, 3, 4 |
+| CV out trimmer | 14 | `001110` | LED 2, 3, 4 |
 
 So, for example: if you press Button A and see **LEDs 1 and 4** lit, that's binary `001001` = 9, which means you're now on the **CV input 2** test. After ~0.8 seconds those LEDs go dark and the test takes over.
 
@@ -114,6 +115,18 @@ Connect a scope (or a logic probe, or another module's pulse input) to the pulse
 
 If you don't have a scope, the loopback trick works here too: patch pulse-out into pulse-in and switch to test 10; you'll see the LED strip flicker rapidly as the output toggles.
 
+### Test 14 — CV output hardware-trimmer calibration
+
+This test is for tuning the **hardware trimmer** on the Brain board — the analog gain pot that sets the absolute scale of the CV output stage. It's a separate concern from the per-board software calibration that lives in flash; the hardware trimmer gets the analog stage roughly right, and the software calibration (set up later via the [CV tuner firmware](https://github.com/shmoergh/brain-cv-tuner)) compensates for the residual drift. To make sure this test reflects the raw analog hardware, it deliberately bypasses software calibration — voltages are written straight to the DAC.
+
+Both CV outputs are switched to the 0–10 V range. **Pot 1 controls CV out 1, Pot 2 controls CV out 2.** Each pot selects a whole-volt step from the set {0, 1, 2, 3, 4, 5} V — turning the pot left-to-right walks through these six values. The output is held at a constant DC voltage (no toggling).
+
+The LED strip shows where each pot is sitting. The six LEDs represent the six voltage steps: LED 1 is 0 V, LED 2 is 1 V, on through LED 6 = 5 V. The currently selected step glows; if both pots happen to land on the same step, that LED is at full brightness, otherwise the contributing channel lights its step at half brightness. So a quick glance tells you which volt each channel is currently outputting without needing to look at the meter.
+
+To actually trim the hardware: connect a multimeter (or scope set to DC) to one of the CV outputs and step the corresponding pot through 0 V → 1 V → 2 V → ... → 5 V. Adjust the trimmer until the **difference** between consecutive steps is as close to 1 V as you can get. You don't need each absolute reading to be perfectly correct — the absolute offset is what software calibration fixes — you only need the *spacing* to be 1 V per step. A common workflow is to set the pot to 0 V, note the multimeter reading, then set the pot to 5 V and aim for a reading exactly 5 V higher than the 0 V reading; nudge the trimmer, repeat, until the spread is right. Then sanity-check the intermediate steps.
+
+Repeat for the other channel using its own trimmer.
+
 ## What to do if a test fails
 
 A failure on a single test usually points you at a specific component you can probe with a multimeter or a scope. A few common starting points:
@@ -140,7 +153,7 @@ The firmware is intentionally short. There are exactly three source files:
 - `tests.cpp` / `tests.h` — the 13 per-test handlers, plus the `on_test_enter()` reset logic.
 - `CMakeLists.txt` — build configuration, including the all-important `brain_storage_configure_flash_reservation()` call.
 
-To add a new test: append a new value to the `TestId` enum in `tests.h`, add a `case` for it in `run_test()` (and `on_test_enter()` if you need to reset state), and the binary indicator and Button A cycling logic will pick it up automatically. The current 13 tests fit easily in 4 bits, so you have room to grow up to 63 tests before the LED strip runs out of binary digits.
+To add a new test: append a new value to the `TestId` enum in `tests.h`, add a `case` for it in `run_test()` (and `on_test_enter()` if you need to reset state), and the binary indicator and Button A cycling logic will pick it up automatically. The current 14 tests fit easily in 4 bits, so you have room to grow up to 63 tests before the LED strip runs out of binary digits.
 
 ### Build from source
 
