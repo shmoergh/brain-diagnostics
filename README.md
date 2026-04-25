@@ -40,26 +40,26 @@ Button A itself doesn't need its own dedicated test — the simple fact that pre
 
 ## Reading the binary indicator
 
-The six panel LEDs encode the test number, with **LED 1 as the least significant bit** (rightmost in the binary number) and **LED 6 as the most significant**. The mapping for all 14 tests:
+The six panel LEDs encode the test number. **LED 1 (leftmost) is the most significant bit** and **LED 6 (rightmost) is the least significant bit**, so you can read the LED strip left-to-right as a 6-bit binary number. The mapping for all 14 tests:
 
-| Test | # | Binary (LED 6 → LED 1) | LEDs lit |
+| Test | # | Binary (LED 1 → LED 6) | LEDs lit |
 |------|---|------------------------|----------|
-| LEDs | 1 | `000001` | LED 1 |
-| Pot 1 | 2 | `000010` | LED 2 |
-| Pot 2 | 3 | `000011` | LED 1, 2 |
-| Pot 3 | 4 | `000100` | LED 3 |
-| Button LED | 5 | `000101` | LED 1, 3 |
-| Button B | 6 | `000110` | LED 2, 3 |
-| MIDI input | 7 | `000111` | LED 1, 2, 3 |
-| CV input 1 | 8 | `001000` | LED 4 |
-| CV input 2 | 9 | `001001` | LED 1, 4 |
-| Pulse input | 10 | `001010` | LED 2, 4 |
-| CV output 1 | 11 | `001011` | LED 1, 2, 4 |
+| LEDs | 1 | `000001` | LED 6 |
+| Pot 1 | 2 | `000010` | LED 5 |
+| Pot 2 | 3 | `000011` | LED 5, 6 |
+| Pot 3 | 4 | `000100` | LED 4 |
+| Button LED | 5 | `000101` | LED 4, 6 |
+| Button B | 6 | `000110` | LED 4, 5 |
+| MIDI input | 7 | `000111` | LED 4, 5, 6 |
+| CV input 1 | 8 | `001000` | LED 3 |
+| CV input 2 | 9 | `001001` | LED 3, 6 |
+| Pulse input | 10 | `001010` | LED 3, 5 |
+| CV output 1 | 11 | `001011` | LED 3, 5, 6 |
 | CV output 2 | 12 | `001100` | LED 3, 4 |
-| Pulse output | 13 | `001101` | LED 1, 3, 4 |
-| CV out trimmer | 14 | `001110` | LED 2, 3, 4 |
+| Pulse output | 13 | `001101` | LED 3, 4, 6 |
+| CV out trimmer | 14 | `001110` | LED 3, 4, 5 |
 
-So, for example: if you press Button A and see **LEDs 1 and 4** lit, that's binary `001001` = 9, which means you're now on the **CV input 2** test. After ~0.8 seconds those LEDs go dark and the test takes over.
+So, for example: if you press Button A and see **LEDs 3 and 6** lit, reading left-to-right that's binary `001001` = 9, which means you're now on the **CV input 2** test. After ~0.8 seconds those LEDs go dark and the test takes over.
 
 ## The tests
 

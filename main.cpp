@@ -17,8 +17,11 @@ uint32_t now_ms() {
 }
 
 void show_binary(uint8_t value) {
+    // LED 1 (index 0) is on the left of the board and acts as the MSB,
+    // so a 6-bit binary number reads naturally left-to-right.
     for (uint8_t i = 0; i < 6; ++i) {
-        if ((value >> i) & 1u) {
+        uint8_t bit = 5 - i;
+        if ((value >> bit) & 1u) {
             g_brain.leds.set_brightness(i, 255);
         } else {
             g_brain.leds.set_brightness(i, 0);
